@@ -76,7 +76,6 @@ func (r *AnsibleOperatorReconciler) Reconcile(ctx context.Context, request recon
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-
 	ident := strconv.Itoa(rand.Int())
 	logger := logf.Log.WithName("reconciler").WithValues(
 		"job", ident,
@@ -302,11 +301,6 @@ func (r *AnsibleOperatorReconciler) markRunning(ctx context.Context, nn types.Na
 	crStatus := getStatus(u)
 
 	// If there is no current status add that we are working on this resource.
-	errCond := ansiblestatus.GetCondition(crStatus, ansiblestatus.FailureConditionType)
-	if errCond != nil {
-		errCond.Status = v1.ConditionFalse
-		ansiblestatus.SetCondition(&crStatus, *errCond)
-	}
 	successCond := ansiblestatus.GetCondition(crStatus, ansiblestatus.SuccessfulConditionType)
 	if successCond != nil {
 		successCond.Status = v1.ConditionFalse
