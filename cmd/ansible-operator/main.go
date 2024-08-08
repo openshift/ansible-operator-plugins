@@ -24,6 +24,7 @@ import (
 	"github.com/operator-framework/ansible-operator-plugins/internal/cmd/ansible-operator/version"
 )
 
+// main() file
 func main() {
 	root := cobra.Command{
 		Short: "Reconcile an Ansible operator project using ansible-runner",

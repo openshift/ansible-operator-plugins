@@ -1,13 +1,14 @@
 FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17 AS builder
 
 ENV GO111MODULE=on \
-    GOFLAGS=-mod=vendor
+    GOFLAGS=-mod=vendor \
+    CGO_ENABLED=0
 
 COPY . /go/src/github.com/openshift/ansible-operator-plugins
 RUN cd /go/src/github.com/openshift/ansible-operator-plugins \
  && make build
 
-FROM registry.ci.openshift.org/ocp/4.17:base
+FROM registry.ci.openshift.org/ocp/4.17:base-rhel9
 
 RUN mkdir -p /etc/ansible \
     && echo "localhost ansible_connection=local" > /etc/ansible/hosts \
