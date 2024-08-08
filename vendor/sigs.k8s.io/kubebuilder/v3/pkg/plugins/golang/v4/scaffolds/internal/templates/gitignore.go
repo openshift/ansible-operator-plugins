@@ -38,8 +38,7 @@ func (f *GitIgnore) SetTemplateDefaults() error {
 	return nil
 }
 
-const gitignoreTemplate = `
-# Binaries for programs and plugins
+const gitignoreTemplate = `# Binaries for programs and plugins
 *.exe
 *.exe~
 *.dll
@@ -48,14 +47,16 @@ const gitignoreTemplate = `
 bin/*
 Dockerfile.cross
 
-# Test binary, build with ` + "`go test -c`" + `
+# Test binary, built with ` + "`go test -c`" + `
 *.test
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
-# Kubernetes Generated files - skip generated files, except for vendored files
+# Go workspace file
+go.work
 
+# Kubernetes Generated files - skip generated files, except for vendored files
 !vendor/**/zz_generated.*
 
 # editor and IDE paraphernalia

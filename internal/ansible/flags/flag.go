@@ -15,11 +15,14 @@
 package flags
 
 import (
+	"crypto/tls"
 	"runtime"
 	"time"
 
 	"github.com/spf13/pflag"
+	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 // Flags - Options to be used by an ansible operator
@@ -43,6 +46,8 @@ type Flags struct {
 	AnsibleArgs                string
 	AnsibleLogEvents           string
 	ProxyPort                  int
+	EnableHTTP2                bool
+	SecureMetrics              bool
 
 	// Path to a controller-runtime componentconfig file.
 	// If this is empty, use default values.
@@ -166,6 +171,7 @@ func (f *Flags) AddTo(flagSet *pflag.FlagSet) {
 		"The type of resource object that is used for locking during leader election."+
 			" Supported options are 'leases', 'endpointsleases' and 'configmapsleases'. Default is configmapsleases.",
 	)
+	_ = flagSet.MarkDeprecated("leader-elect-resource-lock", "This flag is now hardcoded to 'leases', which is the only supported option by client-go")
 	flagSet.DurationVar(&f.LeaseDuration,
 		"leader-elect-lease-duration",
 		15*time.Second,
@@ -195,6 +201,17 @@ func (f *Flags) AddTo(flagSet *pflag.FlagSet) {
 		8888,
 		"Ansible proxy server port. Defaults to 8888.",
 	)
+	flagSet.BoolVar(&f.EnableHTTP2,
+		"enable-http2",
+		false,
+		"enables HTTP/2 on the webhook and metrics servers",
+	)
+
+	flagSet.BoolVar(&f.SecureMetrics,
+		"metrics-secure",
+		false,
+		"enables secure serving of the metrics endpoint",
+	)
 }
 
 // ToManagerOptions uses the flag set in f to configure options.
@@ -210,8 +227,8 @@ func (f *Flags) ToManagerOptions(options manager.Options) manager.Options {
 	}
 
 	// TODO(2.0.0): remove metrics-addr
-	if changed("metrics-bind-address") || changed("metrics-addr") || options.MetricsBindAddress == "" {
-		options.MetricsBindAddress = f.MetricsBindAddress
+	if changed("metrics-bind-address") || changed("metrics-addr") || options.Metrics.BindAddress == "" {
+		options.Metrics.BindAddress = f.MetricsBindAddress
 	}
 	if changed("health-probe-bind-address") || options.HealthProbeBindAddress == "" {
 		options.HealthProbeBindAddress = f.ProbeAddr
@@ -232,12 +249,22 @@ func (f *Flags) ToManagerOptions(options manager.Options) manager.Options {
 	if changed("leader-elect-renew-deadline") || options.RenewDeadline == nil {
 		options.RenewDeadline = &f.RenewDeadline
 	}
-	if changed("leader-elect-resource-lock") || options.LeaderElectionResourceLock == "" {
-		options.LeaderElectionResourceLock = f.LeaderElectionResourceLock
+	if options.LeaderElectionResourceLock == "" {
+		options.LeaderElectionResourceLock = resourcelock.LeasesResourceLock
 	}
 	if changed("graceful-shutdown-timeout") || options.GracefulShutdownTimeout == nil {
 		options.GracefulShutdownTimeout = &f.GracefulShutdownTimeout
 	}
 
+	disableHTTP2 := func(c *tls.Config) {
+		c.NextProtos = []string{"http/1.1"}
+	}
+	if !f.EnableHTTP2 {
+		options.WebhookServer = webhook.NewServer(webhook.Options{
+			TLSOpts: []func(*tls.Config){disableHTTP2},
+		})
+		options.Metrics.TLSOpts = append(options.Metrics.TLSOpts, disableHTTP2)
+	}
+	options.Metrics.SecureServing = f.SecureMetrics
 	return options
 }
