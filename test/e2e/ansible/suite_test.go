@@ -106,9 +106,13 @@ var _ = BeforeSuite(func() {
 		}, 3*time.Minute, time.Second).Should(Succeed())
 	}
 
-	By("building the project image")
-	err = operator.BuildOperatorImage(ansibleSample, image)
-	Expect(err).NotTo(HaveOccurred())
+	if image_env_var, exists := os.LookupEnv("IMAGE_FORMAT"); exists {
+		image = image_env_var
+	} else {
+		By("building the project image")
+		err = operator.BuildOperatorImage(ansibleSample, image)
+		Expect(err).NotTo(HaveOccurred())
+	}
 
 	onKind, err := kind.IsRunningOnKind(kctl)
 	Expect(err).NotTo(HaveOccurred())
@@ -129,9 +133,11 @@ var _ = AfterSuite(func() {
 	}
 
 	By("destroying container image and work dir")
-	cmd := exec.Command("docker", "rmi", "-f", image)
-	if _, err := ansibleSample.CommandContext().Run(cmd); err != nil {
-		Expect(err).To(BeNil())
+	if _, exists := os.LookupEnv("IMAGE_FORMAT"); !exists {
+		cmd := exec.Command("docker", "rmi", "-f", image)
+		if _, err := ansibleSample.CommandContext().Run(cmd); err != nil {
+			Expect(err).To(BeNil())
+		}
 	}
 	if err := os.RemoveAll(testdir); err != nil {
 		Expect(err).To(BeNil())
