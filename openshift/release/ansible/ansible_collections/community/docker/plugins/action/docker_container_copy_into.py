@@ -8,7 +8,6 @@ __metaclass__ = type
 import base64
 
 from ansible import constants as C
-from ansible.errors import AnsibleError
 from ansible.plugins.action import ActionBase
 from ansible.utils.vars import merge_hash
 
@@ -16,7 +15,7 @@ from ansible_collections.community.docker.plugins.module_utils._scramble import 
 
 
 class ActionModule(ActionBase):
-    # Set to True when transfering files to the remote
+    # Set to True when transferring files to the remote
     TRANSFERS_FILES = False
 
     def run(self, tmp=None, task_vars=None):

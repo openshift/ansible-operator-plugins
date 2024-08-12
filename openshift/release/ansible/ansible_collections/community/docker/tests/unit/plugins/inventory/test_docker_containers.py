@@ -6,25 +6,27 @@ from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
 
 
-import json
-import textwrap
-
 import pytest
 
-from ansible_collections.community.docker.tests.unit.compat.mock import MagicMock
-
-from ansible import constants as C
-from ansible.errors import AnsibleError
 from ansible.inventory.data import InventoryData
-from ansible.inventory.manager import InventoryManager
+from ansible.parsing.dataloader import DataLoader
+from ansible.template import Templar
 
 from ansible_collections.community.docker.plugins.inventory.docker_containers import InventoryModule
+from ansible_collections.community.docker.tests.unit.compat.mock import create_autospec
 
 
 @pytest.fixture(scope="module")
-def inventory():
+def templar():
+    dataloader = create_autospec(DataLoader, instance=True)
+    return Templar(loader=dataloader)
+
+
+@pytest.fixture(scope="module")
+def inventory(templar):
     r = InventoryModule()
     r.inventory = InventoryData()
+    r.templar = templar
     return r
 
 
@@ -122,6 +124,7 @@ def test_populate(inventory, mocker):
         'compose': {},
         'groups': {},
         'keyed_groups': {},
+        'filters': None,
     }))
     inventory._populate(client)
 
@@ -153,6 +156,7 @@ def test_populate_service(inventory, mocker):
         'groups': {},
         'keyed_groups': {},
         'docker_host': 'unix://var/run/docker.sock',
+        'filters': None,
     }))
     inventory._populate(client)
 
@@ -194,6 +198,7 @@ def test_populate_stack(inventory, mocker):
         'docker_host': 'unix://var/run/docker.sock',
         'default_ip': '127.0.0.1',
         'private_ssh_port': 22,
+        'filters': None,
     }))
     inventory._populate(client)
 
@@ -219,4 +224,47 @@ def test_populate_stack(inventory, mocker):
     assert len(inventory.inventory.groups['stack_my_stack'].hosts) == 1
     assert len(inventory.inventory.groups['unix://var/run/docker.sock'].hosts) == 1
     assert len(inventory.inventory.groups) == 10
+    assert len(inventory.inventory.hosts) == 1
+
+
+def test_populate_filter_none(inventory, mocker):
+    client = FakeClient(LOVING_THARP)
+
+    inventory.get_option = mocker.MagicMock(side_effect=create_get_option({
+        'verbose_output': True,
+        'connection_type': 'docker-api',
+        'add_legacy_groups': False,
+        'compose': {},
+        'groups': {},
+        'keyed_groups': {},
+        'filters': [
+            {'exclude': True},
+        ],
+    }))
+    inventory._populate(client)
+
+    assert len(inventory.inventory.hosts) == 0
+
+
+def test_populate_filter(inventory, mocker):
+    client = FakeClient(LOVING_THARP)
+
+    inventory.get_option = mocker.MagicMock(side_effect=create_get_option({
+        'verbose_output': True,
+        'connection_type': 'docker-api',
+        'add_legacy_groups': False,
+        'compose': {},
+        'groups': {},
+        'keyed_groups': {},
+        'filters': [
+            {'include': 'docker_state.Running is true'},
+            {'exclude': True},
+        ],
+    }))
+    inventory._populate(client)
+
+    host_1 = inventory.inventory.get_host('loving_tharp')
+    host_1_vars = host_1.get_vars()
+
+    assert host_1_vars['ansible_host'] == 'loving_tharp'
     assert len(inventory.inventory.hosts) == 1

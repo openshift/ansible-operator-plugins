@@ -6,21 +6,16 @@ from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
 
 
-import abc
-import os
-import platform
+import json
 import re
-import sys
-import traceback
 from datetime import timedelta
 
 from ansible.module_utils.basic import env_fallback
 from ansible.module_utils.common.collections import is_sequence
-from ansible.module_utils.common._collections_compat import Sequence
 from ansible.module_utils.six.moves.urllib.parse import urlparse
 
 
-DEFAULT_DOCKER_HOST = 'unix://var/run/docker.sock'
+DEFAULT_DOCKER_HOST = 'unix:///var/run/docker.sock'
 DEFAULT_TLS = False
 DEFAULT_TLS_VERIFY = False
 DEFAULT_TLS_HOSTNAME = 'localhost'  # deprecated
@@ -31,10 +26,15 @@ DOCKER_COMMON_ARGS = dict(
     tls_hostname=dict(type='str', fallback=(env_fallback, ['DOCKER_TLS_HOSTNAME'])),
     api_version=dict(type='str', default='auto', fallback=(env_fallback, ['DOCKER_API_VERSION']), aliases=['docker_api_version']),
     timeout=dict(type='int', default=DEFAULT_TIMEOUT_SECONDS, fallback=(env_fallback, ['DOCKER_TIMEOUT'])),
-    ca_cert=dict(type='path', aliases=['tls_ca_cert', 'cacert_path']),
+    ca_path=dict(type='path', aliases=['ca_cert', 'tls_ca_cert', 'cacert_path']),
     client_cert=dict(type='path', aliases=['tls_client_cert', 'cert_path']),
     client_key=dict(type='path', aliases=['tls_client_key', 'key_path']),
-    ssl_version=dict(type='str', fallback=(env_fallback, ['DOCKER_SSL_VERSION'])),
+    ssl_version=dict(
+        type='str',
+        fallback=(env_fallback, ['DOCKER_SSL_VERSION']),
+        removed_in_version='4.0.0',
+        removed_from_collection='community.docker',
+    ),
     tls=dict(type='bool', default=DEFAULT_TLS, fallback=(env_fallback, ['DOCKER_TLS'])),
     use_ssh_client=dict(type='bool', default=False),
     validate_certs=dict(type='bool', default=DEFAULT_TLS_VERIFY, fallback=(env_fallback, ['DOCKER_TLS_VERIFY']), aliases=['tls_verify']),
@@ -91,6 +91,19 @@ def sanitize_result(data):
         return data
 
 
+def log_debug(msg, pretty_print=False):
+    """Write a log message to docker.log.
+
+    If ``pretty_print=True``, the message will be pretty-printed as JSON.
+    """
+    with open('docker.log', 'a') as log_file:
+        if pretty_print:
+            log_file.write(json.dumps(msg, sort_keys=True, indent=4, separators=(',', ': ')))
+            log_file.write(u'\n')
+        else:
+            log_file.write(msg + u'\n')
+
+
 class DockerBaseClass(object):
     def __init__(self):
         self.debug = False
@@ -98,12 +111,7 @@ class DockerBaseClass(object):
     def log(self, msg, pretty_print=False):
         pass
         # if self.debug:
-        #     log_file = open('docker.log', 'a')
-        #     if pretty_print:
-        #         log_file.write(json.dumps(msg, sort_keys=True, indent=4, separators=(',', ': ')))
-        #         log_file.write(u'\n')
-        #     else:
-        #         log_file.write(msg + u'\n')
+        #     log_debug(msg, pretty_print=pretty_print)
 
 
 def update_tls_hostname(result, old_behavior=False, deprecate_function=None, uses_tls=True):
@@ -345,9 +353,9 @@ def normalize_healthcheck(healthcheck, normalize_test=False):
     result = dict()
 
     # All supported healthcheck parameters
-    options = ('test', 'interval', 'timeout', 'start_period', 'retries')
+    options = ('test', 'test_cli_compatible', 'interval', 'timeout', 'start_period', 'start_interval', 'retries')
 
-    duration_options = ('interval', 'timeout', 'start_period')
+    duration_options = ('interval', 'timeout', 'start_period', 'start_interval')
 
     for key in options:
         if key in healthcheck:
@@ -358,7 +366,7 @@ def normalize_healthcheck(healthcheck, normalize_test=False):
                 continue
             if key in duration_options:
                 value = convert_duration_to_nanosecond(value)
-            if not value:
+            if not value and not (healthcheck.get('test_cli_compatible') and key == 'test'):
                 continue
             if key == 'retries':
                 try:
@@ -368,7 +376,7 @@ def normalize_healthcheck(healthcheck, normalize_test=False):
                         'Cannot parse number of retries for healthcheck. '
                         'Expected an integer, got "{0}".'.format(value)
                     )
-            if key == 'test' and normalize_test:
+            if key == 'test' and value and normalize_test:
                 value = normalize_healthcheck_test(value)
             result[key] = value
 

@@ -13,12 +13,13 @@ DOCUMENTATION = '''
     requirements:
         - L(Docker Machine,https://docs.docker.com/machine/)
     extends_documentation_fragment:
-        - constructed
+        - ansible.builtin.constructed
+        - community.library_inventory_filtering_v1.inventory_filter
     description:
         - Get inventory hosts from Docker Machine.
         - Uses a YAML configuration file that ends with docker_machine.(yml|yaml).
         - The plugin sets standard host variables C(ansible_host), C(ansible_port), C(ansible_user) and C(ansible_ssh_private_key).
-        - The plugin stores the Docker Machine 'env' output variables in I(dm_) prefixed host variables.
+        - The plugin stores the Docker Machine 'env' output variables in C(dm_) prefixed host variables.
 
     options:
         plugin:
@@ -28,12 +29,12 @@ DOCUMENTATION = '''
         daemon_env:
             description:
                 - Whether docker daemon connection environment variables should be fetched, and how to behave if they cannot be fetched.
-                - With C(require) and C(require-silently), fetch them and skip any host for which they cannot be fetched.
-                  A warning will be issued for any skipped host if the choice is C(require).
-                - With C(optional) and C(optional-silently), fetch them and not skip hosts for which they cannot be fetched.
-                  A warning will be issued for hosts where they cannot be fetched if the choice is C(optional).
-                - With C(skip), do not attempt to fetch the docker daemon connection environment variables.
-                - If fetched successfully, the variables will be prefixed with I(dm_) and stored as host variables.
+                - With V(require) and V(require-silently), fetch them and skip any host for which they cannot be fetched.
+                  A warning will be issued for any skipped host if the choice is V(require).
+                - With V(optional) and V(optional-silently), fetch them and not skip hosts for which they cannot be fetched.
+                  A warning will be issued for hosts where they cannot be fetched if the choice is V(optional).
+                - With V(skip), do not attempt to fetch the docker daemon connection environment variables.
+                - If fetched successfully, the variables will be prefixed with C(dm_) and stored as host variables.
             type: str
             choices:
                 - require
@@ -44,15 +45,17 @@ DOCUMENTATION = '''
             default: require
         running_required:
             description:
-                - When C(true), hosts which Docker Machine indicates are in a state other than C(running) will be skipped.
+                - When V(true), hosts which Docker Machine indicates are in a state other than C(running) will be skipped.
             type: bool
             default: true
         verbose_output:
             description:
-                - When C(true), include all available nodes metadata (for exmaple C(Image), C(Region), C(Size)) as a JSON object
+                - When V(true), include all available nodes metadata (for example C(Image), C(Region), C(Size)) as a JSON object
                   named C(docker_machine_node_attributes).
             type: bool
             default: true
+        filters:
+            version_added: 3.5.0
 '''
 
 EXAMPLES = '''
@@ -93,6 +96,9 @@ from ansible.module_utils.common.text.converters import to_text
 from ansible.module_utils.common.process import get_bin_path
 from ansible.plugins.inventory import BaseInventoryPlugin, Constructable, Cacheable
 from ansible.utils.display import Display
+
+from ansible_collections.community.docker.plugins.plugin_utils.unsafe import make_unsafe
+from ansible_collections.community.library_inventory_filtering_v1.plugins.plugin_utils.inventory_filter import parse_filters, filter_host
 
 import json
 import re
@@ -173,7 +179,7 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
 
     def _inspect_docker_machine_host(self, node):
         try:
-            inspect_lines = self._run_command(['inspect', self.node])
+            inspect_lines = self._run_command(['inspect', node])
         except subprocess.CalledProcessError:
             return None
 
@@ -181,7 +187,7 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
 
     def _ip_addr_docker_machine_host(self, node):
         try:
-            ip_addr = self._run_command(['ip', self.node])
+            ip_addr = self._run_command(['ip', node])
         except subprocess.CalledProcessError:
             return None
 
@@ -201,13 +207,18 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
 
     def _populate(self):
         daemon_env = self.get_option('daemon_env')
+        filters = parse_filters(self.get_option('filters'))
         try:
-            for self.node in self._get_machine_names():
-                self.node_attrs = self._inspect_docker_machine_host(self.node)
-                if not self.node_attrs:
+            for node in self._get_machine_names():
+                node_attrs = self._inspect_docker_machine_host(node)
+                if not node_attrs:
                     continue
 
-                machine_name = self.node_attrs['Driver']['MachineName']
+                unsafe_node_attrs = make_unsafe(node_attrs)
+
+                machine_name = unsafe_node_attrs['Driver']['MachineName']
+                if not filter_host(self, machine_name, unsafe_node_attrs, filters):
+                    continue
 
                 # query `docker-machine env` to obtain remote Docker daemon connection settings in the form of commands
                 # that could be used to set environment variables to influence a local Docker client:
@@ -224,40 +235,40 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
                 # check for valid ip address from inspect output, else explicitly use ip command to find host ip address
                 # this works around an issue seen with Google Compute Platform where the IP address was not available
                 # via the 'inspect' subcommand but was via the 'ip' subcomannd.
-                if self.node_attrs['Driver']['IPAddress']:
-                    ip_addr = self.node_attrs['Driver']['IPAddress']
+                if unsafe_node_attrs['Driver']['IPAddress']:
+                    ip_addr = unsafe_node_attrs['Driver']['IPAddress']
                 else:
-                    ip_addr = self._ip_addr_docker_machine_host(self.node)
+                    ip_addr = self._ip_addr_docker_machine_host(node)
 
                 # set standard Ansible remote host connection settings to details captured from `docker-machine`
                 # see: https://docs.ansible.com/ansible/latest/user_guide/intro_inventory.html
-                self.inventory.set_variable(machine_name, 'ansible_host', ip_addr)
-                self.inventory.set_variable(machine_name, 'ansible_port', self.node_attrs['Driver']['SSHPort'])
-                self.inventory.set_variable(machine_name, 'ansible_user', self.node_attrs['Driver']['SSHUser'])
-                self.inventory.set_variable(machine_name, 'ansible_ssh_private_key_file', self.node_attrs['Driver']['SSHKeyPath'])
+                self.inventory.set_variable(machine_name, 'ansible_host', make_unsafe(ip_addr))
+                self.inventory.set_variable(machine_name, 'ansible_port', unsafe_node_attrs['Driver']['SSHPort'])
+                self.inventory.set_variable(machine_name, 'ansible_user', unsafe_node_attrs['Driver']['SSHUser'])
+                self.inventory.set_variable(machine_name, 'ansible_ssh_private_key_file', unsafe_node_attrs['Driver']['SSHKeyPath'])
 
                 # set variables based on Docker Machine tags
-                tags = self.node_attrs['Driver'].get('Tags') or ''
-                self.inventory.set_variable(machine_name, 'dm_tags', tags)
+                tags = unsafe_node_attrs['Driver'].get('Tags') or ''
+                self.inventory.set_variable(machine_name, 'dm_tags', make_unsafe(tags))
 
                 # set variables based on Docker Machine env variables
                 for kv in env_var_tuples:
-                    self.inventory.set_variable(machine_name, 'dm_{0}'.format(kv[0]), kv[1])
+                    self.inventory.set_variable(machine_name, 'dm_{0}'.format(kv[0]), make_unsafe(kv[1]))
 
                 if self.get_option('verbose_output'):
-                    self.inventory.set_variable(machine_name, 'docker_machine_node_attributes', self.node_attrs)
+                    self.inventory.set_variable(machine_name, 'docker_machine_node_attributes', unsafe_node_attrs)
 
                 # Use constructed if applicable
                 strict = self.get_option('strict')
 
                 # Composed variables
-                self._set_composite_vars(self.get_option('compose'), self.node_attrs, machine_name, strict=strict)
+                self._set_composite_vars(self.get_option('compose'), unsafe_node_attrs, machine_name, strict=strict)
 
                 # Complex groups based on jinja2 conditionals, hosts that meet the conditional are added to group
-                self._add_host_to_composed_groups(self.get_option('groups'), self.node_attrs, machine_name, strict=strict)
+                self._add_host_to_composed_groups(self.get_option('groups'), unsafe_node_attrs, machine_name, strict=strict)
 
                 # Create groups based on variable values and add the corresponding hosts to it
-                self._add_host_to_keyed_groups(self.get_option('keyed_groups'), self.node_attrs, machine_name, strict=strict)
+                self._add_host_to_keyed_groups(self.get_option('keyed_groups'), unsafe_node_attrs, machine_name, strict=strict)
 
         except Exception as e:
             raise AnsibleError('Unable to fetch hosts from Docker Machine, this was the original exception: %s' %
