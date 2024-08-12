@@ -35,6 +35,18 @@ options:
     aliases:
       - network_name
 
+  config_from:
+    description:
+      - Specifies the config only network to use the config from.
+    type: str
+    version_added: 3.10.0
+
+  config_only:
+    description:
+      - Sets that this is a config only network.
+    type: bool
+    version_added: 3.10.0
+
   connected:
     description:
       - List of container names or container IDs to connect to a network.
@@ -61,8 +73,8 @@ options:
 
   force:
     description:
-      - With state C(absent) forces disconnecting all containers from the
-        network prior to deleting the network. With state C(present) will
+      - With state V(absent) forces disconnecting all containers from the
+        network prior to deleting the network. With state V(present) will
         disconnect all containers, delete the network and re-create the
         network.
       - This option is required if you have changed the IPAM or driver options
@@ -73,7 +85,7 @@ options:
   appends:
     description:
       - By default the connected list is canonical, meaning containers not on the list are removed from the network.
-      - Use I(appends) to leave existing containers connected.
+      - Use O(appends) to leave existing containers connected.
     type: bool
     default: false
     aliases:
@@ -98,7 +110,7 @@ options:
     description:
       - List of IPAM config blocks. Consult
         L(Docker docs,https://docs.docker.com/compose/compose-file/compose-file-v2/#ipam) for valid options and values.
-        Note that I(iprange) is spelled differently here (we use the notation from the Docker SDK for Python).
+        Note that O(ipam_config[].iprange) is spelled differently here (we use the notation from the Docker SDK for Python).
     type: list
     elements: dict
     suboptions:
@@ -121,14 +133,14 @@ options:
 
   state:
     description:
-      - C(absent) deletes the network. If a network has connected containers, it
-        cannot be deleted. Use the I(force) option to disconnect all containers
+      - V(absent) deletes the network. If a network has connected containers, it
+        cannot be deleted. Use the O(force) option to disconnect all containers
         and delete the network.
-      - C(present) creates the network, if it does not already exist with the
+      - V(present) creates the network, if it does not already exist with the
         specified parameters, and connects the list of containers provided via
         the connected parameter. Containers not on the list will be disconnected.
         An empty list will leave no containers connected to the network. Use the
-        I(appends) option to leave existing containers connected. Use the I(force)
+        O(appends) option to leave existing containers connected. Use the O(force)
         options to force re-creation of the network.
     type: str
     default: present
@@ -163,7 +175,7 @@ options:
 
 notes:
   - When network options are changed, the module disconnects all containers from the network, deletes the network, and re-creates the network.
-    It does not try to reconnect containers, except the ones listed in (I(connected), and even for these, it does not consider specific
+    It does not try to reconnect containers, except the ones listed in (O(connected), and even for these, it does not consider specific
     connection options like fixed IP addresses or MAC addresses. If you need more control over how the containers are connected to the
     network, loop the M(community.docker.docker_container) module to loop over your containers to make sure they are connected properly.
   - The module does not support Docker Swarm. This means that it will not try to disconnect or reconnect services. If services are connected to the
@@ -283,6 +295,8 @@ class TaskParameters(DockerBaseClass):
 
         self.name = None
         self.connected = None
+        self.config_from = None
+        self.config_only = None
         self.driver = None
         self.driver_options = None
         self.ipam_driver = None
@@ -299,6 +313,11 @@ class TaskParameters(DockerBaseClass):
 
         for key, value in client.module.params.items():
             setattr(self, key, value)
+
+        # config_only sets driver to 'null' (and scope to 'local') so force that here. Otherwise we get
+        # diffs of 'null' --> 'bridge' given that the driver option defaults to 'bridge'.
+        if self.config_only:
+            self.driver = 'null'
 
 
 def container_names_in_network(network):
@@ -401,6 +420,14 @@ class DockerNetworkManager(object):
         :return: (bool, list)
         '''
         differences = DifferenceTracker()
+        if self.parameters.config_only is not None and self.parameters.config_only != net.get('ConfigOnly', False):
+            differences.add('config_only',
+                            parameter=self.parameters.config_only,
+                            active=net.get('ConfigOnly', False))
+        if self.parameters.config_from is not None and self.parameters.config_from != net.get('ConfigFrom', {}).get('Network', ''):
+            differences.add('config_from',
+                            parameter=self.parameters.config_from,
+                            active=net.get('ConfigFrom', {}).get('Network', ''))
         if self.parameters.driver and self.parameters.driver != net['Driver']:
             differences.add('driver',
                             parameter=self.parameters.driver,
@@ -503,6 +530,10 @@ class DockerNetworkManager(object):
                 'CheckDuplicate': None,
             }
 
+            if self.parameters.config_only is not None:
+                data['ConfigOnly'] = self.parameters.config_only
+            if self.parameters.config_from:
+                data['ConfigFrom'] = {'Network': self.parameters.config_from}
             if self.parameters.enable_ipv6:
                 data['EnableIPv6'] = True
             if self.parameters.internal:
@@ -630,6 +661,8 @@ class DockerNetworkManager(object):
 def main():
     argument_spec = dict(
         name=dict(type='str', required=True, aliases=['network_name']),
+        config_from=dict(type='str'),
+        config_only=dict(type='bool'),
         connected=dict(type='list', default=[], elements='str', aliases=['containers']),
         state=dict(type='str', default='present', choices=['present', 'absent']),
         driver=dict(type='str', default='bridge'),
@@ -653,6 +686,8 @@ def main():
     )
 
     option_minimal_versions = dict(
+        config_from=dict(docker_api_version='1.30'),
+        config_only=dict(docker_api_version='1.30'),
         scope=dict(docker_api_version='1.30'),
         attachable=dict(docker_api_version='1.26'),
     )

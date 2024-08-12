@@ -11,16 +11,15 @@ import abc
 import os
 import re
 
-from ansible.module_utils.basic import AnsibleModule, env_fallback, missing_required_lib
+from ansible.module_utils.basic import AnsibleModule, missing_required_lib
 from ansible.module_utils.common._collections_compat import Mapping, Sequence
 from ansible.module_utils.six import string_types
-from ansible.module_utils.six.moves.urllib.parse import urlparse
 from ansible.module_utils.parsing.convert_bool import BOOLEANS_TRUE, BOOLEANS_FALSE
 
 from ansible_collections.community.docker.plugins.module_utils.version import LooseVersion
 
 try:
-    from requests.exceptions import RequestException, SSLError
+    from requests.exceptions import RequestException, SSLError  # noqa: F401, pylint: disable=unused-import
 except ImportError:
     # Define an exception class RequestException so that our code doesn't break.
     class RequestException(Exception):
@@ -40,18 +39,18 @@ from ansible_collections.community.docker.plugins.module_utils._api.utils.utils 
     parse_repository_tag,
 )
 
-from ansible_collections.community.docker.plugins.module_utils.util import (
+from ansible_collections.community.docker.plugins.module_utils.util import (  # noqa: F401, pylint: disable=unused-import
     DEFAULT_DOCKER_HOST,
     DEFAULT_TLS,
     DEFAULT_TLS_VERIFY,
-    DEFAULT_TLS_HOSTNAME,
+    DEFAULT_TLS_HOSTNAME,  # TODO: remove
     DEFAULT_TIMEOUT_SECONDS,
     DOCKER_COMMON_ARGS,
     DOCKER_MUTUALLY_EXCLUSIVE,
     DOCKER_REQUIRED_TOGETHER,
-    DEFAULT_DOCKER_REGISTRY,
-    is_image_name_id,
-    is_valid_tag,
+    DEFAULT_DOCKER_REGISTRY,  # TODO: remove
+    is_image_name_id,  # TODO: remove
+    is_valid_tag,  # TODO: remove
     sanitize_result,
     update_tls_hostname,
 )
@@ -132,12 +131,8 @@ class AnsibleDockerClientBase(Client):
     def log(self, msg, pretty_print=False):
         pass
         # if self.debug:
-        #     log_file = open('docker.log', 'a')
-        #     if pretty_print:
-        #         log_file.write(json.dumps(msg, sort_keys=True, indent=4, separators=(',', ': ')))
-        #         log_file.write(u'\n')
-        #     else:
-        #         log_file.write(msg + u'\n')
+        #     from .util import log_debug
+        #     log_debug(msg, pretty_print=pretty_print)
 
     @abc.abstractmethod
     def fail(self, msg, **kwargs):
@@ -207,7 +202,7 @@ class AnsibleDockerClientBase(Client):
                                          'DOCKER_TLS_HOSTNAME', None, type='str'),
             api_version=self._get_value('api_version', params['api_version'], 'DOCKER_API_VERSION',
                                         'auto', type='str'),
-            cacert_path=self._get_value('cacert_path', params['ca_cert'], 'DOCKER_CERT_PATH', None, type='str'),
+            cacert_path=self._get_value('cacert_path', params['ca_path'], 'DOCKER_CERT_PATH', None, type='str'),
             cert_path=self._get_value('cert_path', params['client_cert'], 'DOCKER_CERT_PATH', None, type='str'),
             key_path=self._get_value('key_path', params['client_key'], 'DOCKER_CERT_PATH', None, type='str'),
             ssl_version=self._get_value('ssl_version', params['ssl_version'], 'DOCKER_SSL_VERSION', None, type='str'),
@@ -397,7 +392,7 @@ class AnsibleDockerClientBase(Client):
                     images = self._image_lookup(lookup, tag)
 
         if len(images) > 1:
-            self.fail("Registry returned more than one result for %s:%s" % (name, tag))
+            self.fail("Daemon returned more than one result for %s:%s" % (name, tag))
 
         if len(images) == 1:
             try:

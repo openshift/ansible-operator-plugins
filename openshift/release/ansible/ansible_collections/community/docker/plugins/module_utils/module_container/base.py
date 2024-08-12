@@ -19,8 +19,13 @@ from ansible.module_utils.six import string_types
 
 from ansible_collections.community.docker.plugins.module_utils.util import (
     clean_dict_booleans_for_docker_api,
+    compare_generic,
     normalize_healthcheck,
     omit_none_from_dict,
+)
+
+from ansible_collections.community.docker.plugins.module_utils._platform import (
+    compare_platform_strings,
 )
 
 from ansible_collections.community.docker.plugins.module_utils._api.utils.utils import (
@@ -67,6 +72,7 @@ class Option(object):
         not_a_container_option=False,
         not_an_ansible_option=False,
         copy_comparison_from=None,
+        compare=None,
     ):
         self.name = name
         self.type = type
@@ -106,6 +112,11 @@ class Option(object):
         self.not_a_container_option = not_a_container_option
         self.not_an_ansible_option = not_an_ansible_option
         self.copy_comparison_from = copy_comparison_from
+        self.compare = (
+            lambda param_value, container_value: compare(self, param_value, container_value)
+        ) if compare else (
+            lambda param_value, container_value: compare_generic(param_value, container_value, self.comparison, self.comparison_type)
+        )
 
 
 class OptionGroup(object):
@@ -166,17 +177,21 @@ class OptionGroup(object):
 class Engine(object):
     min_api_version = None  # string or None
     min_api_version_obj = None  # LooseVersion object or None
+    extra_option_minimal_versions = None  # dict[str, dict[str, Any]] or None
 
     @abc.abstractmethod
-    def get_value(self, module, container, api_version, options):
+    def get_value(self, module, container, api_version, options, image, host_info):
         pass
+
+    def compare_value(self, option, param_value, container_value):
+        return option.compare(param_value, container_value)
 
     @abc.abstractmethod
     def set_value(self, module, data, api_version, options, values):
         pass
 
     @abc.abstractmethod
-    def get_expected_values(self, module, client, api_version, options, image, values):
+    def get_expected_values(self, module, client, api_version, options, image, values, host_info):
         pass
 
     @abc.abstractmethod
@@ -199,6 +214,14 @@ class Engine(object):
     def can_update_value(self, api_version):
         pass
 
+    @abc.abstractmethod
+    def needs_container_image(self, values):
+        pass
+
+    @abc.abstractmethod
+    def needs_host_info(self, values):
+        pass
+
 
 class EngineDriver(object):
     name = None  # string
@@ -206,6 +229,10 @@ class EngineDriver(object):
     @abc.abstractmethod
     def setup(self, argument_spec, mutually_exclusive=None, required_together=None, required_one_of=None, required_if=None, required_by=None):
         # Return (module, active_options, client)
+        pass
+
+    @abc.abstractmethod
+    def get_host_info(self, client):
         pass
 
     @abc.abstractmethod
@@ -483,6 +510,8 @@ def _preprocess_networks(module, values):
                         parsed_link = (link, link)
                     parsed_links.append(tuple(parsed_link))
                 network['links'] = parsed_links
+            if network['mac_address']:
+                network['mac_address'] = network['mac_address'].replace('-', ':')
 
     return values
 
@@ -733,6 +762,15 @@ def _preprocess_ports(module, values):
     return values
 
 
+def _compare_platform(option, param_value, container_value):
+    if option.comparison == 'ignore':
+        return True
+    try:
+        return compare_platform_strings(param_value, container_value)
+    except ValueError:
+        return param_value == container_value
+
+
 OPTION_AUTO_REMOVE = (
     OptionGroup()
     .add_option('auto_remove', type='bool')
@@ -897,9 +935,11 @@ OPTION_HEALTHCHECK = (
     OptionGroup(preprocess=_preprocess_healthcheck)
     .add_option('healthcheck', type='dict', ansible_suboptions=dict(
         test=dict(type='raw'),
+        test_cli_compatible=dict(type='bool', default=False),
         interval=dict(type='str'),
         timeout=dict(type='str'),
         start_period=dict(type='str'),
+        start_interval=dict(type='str'),
         retries=dict(type='int'),
     ))
 )
@@ -910,7 +950,7 @@ OPTION_HOSTNAME = (
 )
 
 OPTION_IMAGE = (
-    OptionGroup(preprocess=_preprocess_networks)
+    OptionGroup()
     .add_option('image', type='str')
 )
 
@@ -984,6 +1024,7 @@ OPTION_NETWORK = (
         ipv6_address=dict(type='str'),
         aliases=dict(type='list', elements='str'),
         links=dict(type='list', elements='str'),
+        mac_address=dict(type='str'),
     ))
 )
 
@@ -1009,7 +1050,7 @@ OPTION_PIDS_LIMIT = (
 
 OPTION_PLATFORM = (
     OptionGroup()
-    .add_option('platform', type='str')
+    .add_option('platform', type='str', compare=_compare_platform)
 )
 
 OPTION_PRIVILEGED = (
