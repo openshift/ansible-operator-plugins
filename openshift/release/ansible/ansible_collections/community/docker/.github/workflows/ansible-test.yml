@@ -18,6 +18,11 @@ on:
   schedule:
     - cron: '0 9 * * *'
 
+concurrency:
+  # Make sure there is at most one active run per PR, but do not cancel any non-PR runs
+  group: ${{ github.workflow }}-${{ (github.head_ref && github.event.number) || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   sanity:
     name: EOL Sanity (Ⓐ${{ matrix.ansible }})
@@ -25,6 +30,9 @@ jobs:
       matrix:
         ansible:
           - '2.11'
+          - '2.12'
+          - '2.13'
+          - '2.14'
     # Ansible-test on various stable branches does not yet work well with cgroups v2.
     # Since ubuntu-latest now uses Ubuntu 22.04, we need to fall back to the ubuntu-20.04
     # image for these stable branches. The list of branches where this is necessary will
@@ -38,11 +46,14 @@ jobs:
       - name: Perform sanity testing
         uses: felixfontein/ansible-test-gh-action@main
         with:
-          ansible-core-github-repository-slug: felixfontein/ansible
+          ansible-core-github-repository-slug: ${{ contains(fromJson('["2.10", "2.11"]'), matrix.ansible) && 'felixfontein/ansible' || 'ansible/ansible' }}
           ansible-core-version: stable-${{ matrix.ansible }}
+          codecov-token: ${{ secrets.CODECOV_TOKEN }}
           coverage: ${{ github.event_name == 'schedule' && 'always' || 'never' }}
           pull-request-change-detection: 'true'
           testing-type: sanity
+          pre-test-cmd: >-
+            git clone --depth=1 --single-branch --branch stable-1 https://github.com/ansible-collections/community.library_inventory_filtering.git ../../community/library_inventory_filtering_v1
 
   units:
     # Ansible-test on various stable branches does not yet work well with cgroups v2.
@@ -61,18 +72,22 @@ jobs:
       matrix:
         ansible:
           - '2.11'
+          - '2.12'
+          - '2.13'
+          - '2.14'
 
     steps:
-      - name: >-
-          Perform unit testing against
-          Ansible version ${{ matrix.ansible }}
+      - name: Perform unit testing against Ansible version ${{ matrix.ansible }}
         uses: felixfontein/ansible-test-gh-action@main
         with:
-          ansible-core-github-repository-slug: felixfontein/ansible
+          ansible-core-github-repository-slug: ${{ contains(fromJson('["2.10", "2.11"]'), matrix.ansible) && 'felixfontein/ansible' || 'ansible/ansible' }}
           ansible-core-version: stable-${{ matrix.ansible }}
+          codecov-token: ${{ secrets.CODECOV_TOKEN }}
           coverage: ${{ github.event_name == 'schedule' && 'always' || 'never' }}
           pull-request-change-detection: 'true'
           testing-type: units
+          pre-test-cmd: >-
+            git clone --depth=1 --single-branch --branch stable-1 https://github.com/ansible-collections/community.library_inventory_filtering.git ../../community/library_inventory_filtering_v1
 
   integration:
     # Ansible-test on various stable branches does not yet work well with cgroups v2.
@@ -96,6 +111,10 @@ jobs:
           - ''
         target:
           - ''
+        extra-constraints:
+          # Specifying this other than '' likely destroys change detection, but at least it will make
+          # CI pass when necessary...
+          - ''
         exclude:
           - ansible: ''
         include:
@@ -109,23 +128,117 @@ jobs:
             python: ''
             target: azp/5/
           - ansible: '2.11'
+            docker: fedora32
+            python: ''
+            target: azp/6/
+          - ansible: '2.11'
             docker: alpine3
             python: ''
             target: azp/4/
+            extra-constraints: urllib3 < 2.0.0
           - ansible: '2.11'
             docker: alpine3
             python: ''
             target: azp/5/
+          - ansible: '2.11'
+            docker: alpine3
+            python: ''
+            target: azp/6/
+          # 2.12
+          - ansible: '2.12'
+            docker: fedora33
+            python: ''
+            target: azp/4/
+          - ansible: '2.12'
+            docker: fedora33
+            python: ''
+            target: azp/5/
+          - ansible: '2.12'
+            docker: fedora33
+            python: ''
+            target: azp/6/
+          - ansible: '2.12'
+            docker: fedora34
+            python: ''
+            target: azp/4/
+          - ansible: '2.12'
+            docker: fedora34
+            python: ''
+            target: azp/5/
+          - ansible: '2.12'
+            docker: fedora34
+            python: ''
+            target: azp/6/
+          - ansible: '2.12'
+            docker: ubuntu1804
+            python: ''
+            target: azp/4/
+          - ansible: '2.12'
+            docker: ubuntu1804
+            python: ''
+            target: azp/5/
+          - ansible: '2.12'
+            docker: ubuntu1804
+            python: ''
+            target: azp/6/
+          # 2.13
+          - ansible: '2.13'
+            docker: fedora35
+            python: ''
+            target: azp/4/
+          - ansible: '2.13'
+            docker: fedora35
+            python: ''
+            target: azp/5/
+          - ansible: '2.13'
+            docker: fedora35
+            python: ''
+            target: azp/6/
+          - ansible: '2.13'
+            docker: opensuse15py2
+            python: ''
+            target: azp/4/
+          - ansible: '2.13'
+            docker: opensuse15py2
+            python: ''
+            target: azp/5/
+          - ansible: '2.13'
+            docker: opensuse15py2
+            python: ''
+            target: azp/6/
+          - ansible: '2.13'
+            docker: alpine3
+            python: ''
+            target: azp/4/
+          - ansible: '2.13'
+            docker: alpine3
+            python: ''
+            target: azp/5/
+          - ansible: '2.13'
+            docker: alpine3
+            python: ''
+            target: azp/6/
+          # 2.14
+          - ansible: '2.14'
+            docker: alpine3
+            python: ''
+            target: azp/4/
+          - ansible: '2.14'
+            docker: alpine3
+            python: ''
+            target: azp/5/
+          - ansible: '2.14'
+            docker: alpine3
+            python: ''
+            target: azp/6/
 
     steps:
-      - name: >-
-          Perform integration testing against
-          Ansible version ${{ matrix.ansible }}
-          under Python ${{ matrix.python }}
+      - name: Perform integration testing against Ansible version ${{ matrix.ansible }} under Python ${{ matrix.python }}
         uses: felixfontein/ansible-test-gh-action@main
         with:
-          ansible-core-github-repository-slug: felixfontein/ansible
+          ansible-core-github-repository-slug: ${{ contains(fromJson('["2.10", "2.11"]'), matrix.ansible) && 'felixfontein/ansible' || 'ansible/ansible' }}
           ansible-core-version: stable-${{ matrix.ansible }}
+          codecov-token: ${{ secrets.CODECOV_TOKEN }}
           coverage: ${{ github.event_name == 'schedule' && 'always' || 'never' }}
           docker-image: ${{ matrix.docker }}
           integration-continue-on-error: 'false'
@@ -139,6 +252,11 @@ jobs:
             git clone --depth=1 --single-branch https://github.com/ansible-collections/community.crypto.git ../../community/crypto
             ;
             git clone --depth=1 --single-branch https://github.com/ansible-collections/community.general.git ../../community/general
+            ;
+            git clone --depth=1 --single-branch --branch stable-1 https://github.com/ansible-collections/community.library_inventory_filtering.git ../../community/library_inventory_filtering_v1
+            ${{ matrix.extra-constraints && format('; echo ''{0}'' >> tests/utils/constraints.txt', matrix.extra-constraints) || '' }}
+            ;
+            cat tests/utils/constraints.txt
           pull-request-change-detection: 'true'
           target: ${{ matrix.target }}
           target-python-version: ${{ matrix.python }}

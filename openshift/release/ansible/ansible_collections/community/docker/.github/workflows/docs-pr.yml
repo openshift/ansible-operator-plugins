@@ -19,7 +19,7 @@ jobs:
     permissions:
       contents: read
     name: Build Ansible Docs
-    uses: ansible-community/github-docs-build/.github/workflows/_shared-docs-build-pr.yml@main
+    uses: felixfontein/github-docs-build/.github/workflows/_shared-docs-build-pr.yml@base-ref
     with:
       collection-name: community.docker
       init-lenient: false
@@ -32,6 +32,7 @@ jobs:
       init-extra-html-theme-options: |
         documentation_home_url=https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/branch/main/
       render-file-line: '> * `$<status>` [$<path_tail>](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr/${{ github.event.number }}/$<path_tail>)'
+      extra-collections: community.library_inventory_filtering_v1
 
   publish-docs-gh-pages:
     # for now we won't run this on forks

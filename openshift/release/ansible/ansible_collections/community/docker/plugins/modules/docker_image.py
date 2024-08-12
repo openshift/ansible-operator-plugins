@@ -20,6 +20,7 @@ description:
 
 notes:
   - Building images is done using Docker daemon's API. It is not possible to use BuildKit / buildx this way.
+    Use M(community.docker.docker_image_build) to build images with BuildKit.
 
 extends_documentation_fragment:
   - community.docker.docker.api_documentation
@@ -38,12 +39,12 @@ options:
   source:
     description:
       - "Determines where the module will try to retrieve the image from."
-      - "Use C(build) to build the image from a C(Dockerfile). I(build.path) must
+      - "Use V(build) to build the image from a C(Dockerfile). O(build.path) must
          be specified when this value is used."
-      - "Use C(load) to load the image from a C(.tar) file. I(load_path) must
+      - "Use V(load) to load the image from a C(.tar) file. O(load_path) must
          be specified when this value is used."
-      - "Use C(pull) to pull the image from a registry."
-      - "Use C(local) to make sure that the image is already available on the local
+      - "Use V(pull) to pull the image from a registry."
+      - "Use V(local) to make sure that the image is already available on the local
          docker daemon. This means that the module does not try to build, pull or load the image."
     type: str
     choices:
@@ -63,8 +64,8 @@ options:
         elements: str
       dockerfile:
         description:
-          - Use with state C(present) and source C(build) to provide an alternate name for the Dockerfile to use when building an image.
-          - This can also include a relative path (relative to I(path)).
+          - Use with O(state=present) and O(source=build) to provide an alternate name for the Dockerfile to use when building an image.
+          - This can also include a relative path (relative to O(build.path)).
         type: str
       http_timeout:
         description:
@@ -112,13 +113,21 @@ options:
         suboptions:
           memory:
             description:
-              - Set memory limit for build.
-            type: int
+              - "Memory limit for build in format C(<number>[<unit>]). Number is a positive integer.
+                Unit can be V(B) (byte), V(K) (kibibyte, 1024B), V(M) (mebibyte), V(G) (gibibyte),
+                V(T) (tebibyte), or V(P) (pebibyte)."
+              - Omitting the unit defaults to bytes.
+              - Before community.docker 3.6.0, no units were allowed.
+            type: str
           memswap:
             description:
-              - Total memory (memory + swap).
-              - Use C(-1) to disable swap.
-            type: int
+              - "Total memory limit (memory + swap) for build in format C(<number>[<unit>]), or
+                the special values V(unlimited) or V(-1) for unlimited swap usage.
+                Number is a positive integer. Unit can be V(B) (byte), V(K) (kibibyte, 1024B),
+                V(M) (mebibyte), V(G) (gibibyte), V(T) (tebibyte), or V(P) (pebibyte)."
+              - Omitting the unit defaults to bytes.
+              - Before community.docker 3.6.0, no units were allowed, and neither was the special value V(unlimited).
+            type: str
           cpushares:
             description:
               - CPU shares (relative weight).
@@ -126,11 +135,11 @@ options:
           cpusetcpus:
             description:
               - CPUs in which to allow execution.
-              - For example, C(0-3) or C(0,1).
+              - For example, V(0-3) or V(0,1).
             type: str
       use_config_proxy:
         description:
-          - If set to C(true) and a proxy configuration is specified in the docker client configuration
+          - If set to V(true) and a proxy configuration is specified in the docker client configuration
             (by default C($HOME/.docker/config.json)), the corresponding environment variables will
             be set in the container being built.
         type: bool
@@ -144,37 +153,50 @@ options:
           - Platform in the format C(os[/arch[/variant]]).
         type: str
         version_added: 1.1.0
+      shm_size:
+        description:
+          - "Size of C(/dev/shm) in format C(<number>[<unit>]). Number is positive integer.
+            Unit can be V(B) (byte), V(K) (kibibyte, 1024B), V(M) (mebibyte), V(G) (gibibyte),
+            V(T) (tebibyte), or V(P) (pebibyte)."
+          - Omitting the unit defaults to bytes. If you omit the size entirely, Docker daemon uses V(64M).
+        type: str
+        version_added: 3.6.0
+      labels:
+        description:
+          - Dictionary of key value pairs.
+        type: dict
+        version_added: 3.6.0
   archive_path:
     description:
-      - Use with state C(present) to archive an image to a .tar file.
+      - Use with O(state=present) to archive an image to a C(.tar) file.
     type: path
   load_path:
     description:
-      - Use with state C(present) to load an image from a .tar file.
-      - Set I(source) to C(load) if you want to load the image.
+      - Use with O(state=present) to load an image from a C(.tar) file.
+      - Set O(source=load) if you want to load the image.
     type: path
   force_source:
     description:
-      - Use with state C(present) to build, load or pull an image (depending on the
-        value of the I(source) option) when the image already exists.
+      - Use with O(state=present) to build, load or pull an image (depending on the
+        value of the O(source) option) when the image already exists.
     type: bool
     default: false
   force_absent:
     description:
-      - Use with state I(absent) to un-tag and remove all images matching the specified name.
+      - Use with O(state=absent) to un-tag and remove all images matching the specified name.
     type: bool
     default: false
   force_tag:
     description:
-      - Use with state C(present) to force tagging an image.
+      - Use with O(state=present) to force tagging an image.
     type: bool
     default: false
   name:
     description:
       - "Image name. Name format will be one of: C(name), C(repository/name), C(registry_server:port/name).
         When pushing or pulling an image the name can optionally include the tag by appending C(:tag_name)."
-      - Note that image IDs (hashes) are only supported for I(state=absent), for I(state=present) with I(source=load),
-        and for I(state=present) with I(source=local).
+      - Note that image IDs (hashes) are only supported for O(state=absent), for O(state=present) with O(source=load),
+        and for O(state=present) with O(source=local).
     type: str
     required: true
   pull:
@@ -191,23 +213,23 @@ options:
         type: str
   push:
     description:
-      - Push the image to the registry. Specify the registry as part of the I(name) or I(repository) parameter.
+      - Push the image to the registry. Specify the registry as part of the O(name) or O(repository) parameter.
     type: bool
     default: false
   repository:
     description:
-      - Use with state C(present) to tag the image.
-      - Expects format C(repository:tag). If no tag is provided, will use the value of the I(tag) parameter or C(latest).
-      - If I(push=true), I(repository) must either include a registry, or will be assumed to belong to the default
+      - Use with O(state=present) to tag the image.
+      - Expects format C(repository:tag). If no tag is provided, will use the value of the O(tag) parameter or V(latest).
+      - If O(push=true), O(repository) must either include a registry, or will be assumed to belong to the default
         registry (Docker Hub).
     type: str
   state:
     description:
       - Make assertions about the state of an image.
-      - When C(absent) an image will be removed. Use the force option to un-tag and remove all images
+      - When V(absent) an image will be removed. Use the force option to un-tag and remove all images
         matching the provided name.
-      - When C(present) check if an image exists using the provided name and tag. If the image is not found or the
-        force option is used, the image will either be pulled, built or loaded, depending on the I(source) option.
+      - When V(present) check if an image exists using the provided name and tag. If the image is not found or the
+        force option is used, the image will either be pulled, built or loaded, depending on the O(source) option.
     type: str
     default: present
     choices:
@@ -216,8 +238,8 @@ options:
   tag:
     description:
       - Used to select an image when pulling. Will be added to the image when pushing, tagging or building. Defaults to
-        I(latest).
-      - If I(name) parameter format is I(name:tag), then tag value from I(name) will take precedence.
+        V(latest).
+      - If O(name) parameter format is C(name:tag), then tag value from O(name) will take precedence.
     type: str
     default: latest
 
@@ -229,6 +251,15 @@ author:
   - Chris Houseknecht (@chouseknecht)
   - Sorin Sbarnea (@ssbarnea)
 
+seealso:
+  - module: community.docker.docker_image_build
+  - module: community.docker.docker_image_export
+  - module: community.docker.docker_image_info
+  - module: community.docker.docker_image_load
+  - module: community.docker.docker_image_pull
+  - module: community.docker.docker_image_push
+  - module: community.docker.docker_image_remove
+  - module: community.docker.docker_image_tag
 '''
 
 EXAMPLES = '''
@@ -338,6 +369,7 @@ import os
 import traceback
 
 from ansible.module_utils.common.text.converters import to_native
+from ansible.module_utils.common.text.formatters import human_to_bytes
 
 from ansible_collections.community.docker.plugins.module_utils.common_api import (
     AnsibleDockerClient,
@@ -377,6 +409,17 @@ from ansible_collections.community.docker.plugins.module_utils._api.utils.utils 
 )
 
 
+def convert_to_bytes(value, module, name, unlimited_value=None):
+    if value is None:
+        return value
+    try:
+        if unlimited_value is not None and value in ('unlimited', str(unlimited_value)):
+            return unlimited_value
+        return human_to_bytes(value)
+    except ValueError as exc:
+        module.fail_json(msg='Failed to convert %s to bytes: %s' % (name, to_native(exc)))
+
+
 class ImageManager(DockerBaseClass):
 
     def __init__(self, client, results):
@@ -402,6 +445,12 @@ class ImageManager(DockerBaseClass):
         self.archive_path = parameters['archive_path']
         self.cache_from = build.get('cache_from')
         self.container_limits = build.get('container_limits')
+        if self.container_limits and 'memory' in self.container_limits:
+            self.container_limits['memory'] = convert_to_bytes(
+                self.container_limits['memory'], self.client.module, 'build.container_limits.memory')
+        if self.container_limits and 'memswap' in self.container_limits:
+            self.container_limits['memswap'] = convert_to_bytes(
+                self.container_limits['memswap'], self.client.module, 'build.container_limits.memswap', unlimited_value=-1)
         self.dockerfile = build.get('dockerfile')
         self.force_source = parameters['force_source']
         self.force_absent = parameters['force_absent']
@@ -424,6 +473,8 @@ class ImageManager(DockerBaseClass):
         self.buildargs = build.get('args')
         self.build_platform = build.get('platform')
         self.use_config_proxy = build.get('use_config_proxy')
+        self.shm_size = convert_to_bytes(build.get('shm_size'), self.client.module, 'build.shm_size')
+        self.labels = clean_dict_booleans_for_docker_api(build.get('labels'))
 
         # If name contains a tag, it takes precedence over tag parameter.
         if not is_image_name_id(self.name):
@@ -825,6 +876,12 @@ class ImageManager(DockerBaseClass):
         if self.build_platform is not None:
             params['platform'] = self.build_platform
 
+        if self.shm_size is not None:
+            params['shmsize'] = self.shm_size
+
+        if self.labels:
+            params['labels'] = json.dumps(self.labels)
+
         if context is not None:
             headers['Content-Type'] = 'application/tar'
 
@@ -945,8 +1002,8 @@ def main():
         build=dict(type='dict', options=dict(
             cache_from=dict(type='list', elements='str'),
             container_limits=dict(type='dict', options=dict(
-                memory=dict(type='int'),
-                memswap=dict(type='int'),
+                memory=dict(type='str'),
+                memswap=dict(type='str'),
                 cpushares=dict(type='int'),
                 cpusetcpus=dict(type='str'),
             )),
@@ -962,6 +1019,8 @@ def main():
             target=dict(type='str'),
             etc_hosts=dict(type='dict'),
             platform=dict(type='str'),
+            shm_size=dict(type='str'),
+            labels=dict(type='dict'),
         )),
         archive_path=dict(type='path'),
         force_source=dict(type='bool', default=False),

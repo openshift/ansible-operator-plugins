@@ -4,6 +4,411 @@ Docker Community Collection Release Notes
 
 .. contents:: Topics
 
+v3.10.3
+=======
+
+Release Summary
+---------------
+
+Bugfix release.
+
+Bugfixes
+--------
+
+- docker and nsenter connection plugins, docker_container_exec module - avoid using the deprecated ``ansible.module_utils.compat.selectors`` module util with Python 3 (https://github.com/ansible-collections/community.docker/issues/870, https://github.com/ansible-collections/community.docker/pull/871).
+
+v3.10.2
+=======
+
+Release Summary
+---------------
+
+Bugfix release.
+
+Bugfixes
+--------
+
+- vendored Docker SDK for Python - include a fix requests 2.32.2+ compatibility (https://github.com/ansible-collections/community.docker/issues/860, https://github.com/psf/requests/issues/6707, https://github.com/ansible-collections/community.docker/pull/864).
+
+v3.10.1
+=======
+
+Release Summary
+---------------
+
+Hotfix release for requests 2.32.0 compatibility.
+
+Bugfixes
+--------
+
+- vendored Docker SDK for Python - include a hotfix for requests 2.32.0 compatibility (https://github.com/ansible-collections/community.docker/issues/860, https://github.com/docker/docker-py/issues/3256, https://github.com/ansible-collections/community.docker/pull/861).
+
+Known Issues
+------------
+
+- Please note that the fix for requests 2.32.0 included in community.docker 3.10.1 only
+  fixes problems with the *vendored* Docker SDK for Python code. Modules and plugins that
+  use Docker SDK for Python can still fail due to the SDK currently being incompatible
+  with requests 2.32.0.
+
+  If you still experience problems with requests 2.32.0, such as error messages like
+  ``Not supported URL scheme http+docker``, please restrict requests to ``<2.32.0``.
+
+v3.10.0
+=======
+
+Release Summary
+---------------
+
+Feature release.
+
+Minor Changes
+-------------
+
+- docker_container - adds ``healthcheck.start_interval`` to support healthcheck start interval setting on containers (https://github.com/ansible-collections/community.docker/pull/848).
+- docker_container - adds ``healthcheck.test_cli_compatible`` to allow omit test option on containers without remove existing image test (https://github.com/ansible-collections/community.docker/pull/847).
+- docker_image_build - add ``outputs`` option to allow configuring outputs for the build (https://github.com/ansible-collections/community.docker/pull/852).
+- docker_image_build - add ``secrets`` option to allow passing secrets to the build (https://github.com/ansible-collections/community.docker/pull/852).
+- docker_image_build - allow ``platform`` to be a list of platforms instead of only a single platform for multi-platform builds (https://github.com/ansible-collections/community.docker/pull/852).
+- docker_network - adds ``config_only`` and ``config_from`` to support creating and using config only networks (https://github.com/ansible-collections/community.docker/issues/395).
+- docker_prune - add new options ``builder_cache_all``, ``builder_cache_filters``, and ``builder_cache_keep_storage``, and a new return value ``builder_cache_caches_deleted`` for pruning build caches (https://github.com/ansible-collections/community.docker/issues/844, https://github.com/ansible-collections/community.docker/issues/845).
+- docker_swarm_service - adds ``sysctls`` to support sysctl settings on swarm services (https://github.com/ansible-collections/community.docker/issues/190).
+
+Deprecated Features
+-------------------
+
+- docker_compose - the Docker Compose v1 module is deprecated and will be removed from community.docker 4.0.0. Please migrate to the ``community.docker.docker_compose_v2`` module, which works with Docker Compose v2 (https://github.com/ansible-collections/community.docker/issues/823, https://github.com/ansible-collections/community.docker/pull/833).
+- various modules and plugins - the ``ssl_version`` option has been deprecated and will be removed from community.docker 4.0.0. It has already been removed from Docker SDK for Python 7.0.0, and was only necessary in the past to work around SSL/TLS issues (https://github.com/ansible-collections/community.docker/pull/853).
+
+v3.9.0
+======
+
+Release Summary
+---------------
+
+Bugfix and feature release.
+
+Minor Changes
+-------------
+
+- The EE requirements now include PyYAML, since the ``docker_compose_v2*`` modules depend on it when the ``definition`` option is used. This should not have a noticable effect on generated EEs since ansible-core itself depends on PyYAML as well, and ansible-builder explicitly ignores this dependency (https://github.com/ansible-collections/community.docker/pull/832).
+- docker_compose_v2* - the new option ``check_files_existing`` allows to disable the check for one of the files ``compose.yaml``, ``compose.yml``, ``docker-compose.yaml``, and ``docker-compose.yml`` in ``project_src`` if ``files`` is not specified. This is necessary if a non-standard compose filename is specified through other means, like the ``COMPOSE_FILE`` environment variable (https://github.com/ansible-collections/community.docker/issues/838, https://github.com/ansible-collections/community.docker/pull/839).
+- docker_compose_v2* modules - allow to provide an inline definition of the compose content instead of having to provide a ``project_src`` directory with the compose file written into it (https://github.com/ansible-collections/community.docker/issues/829, https://github.com/ansible-collections/community.docker/pull/832).
+- vendored Docker SDK for Python - remove unused code that relies on functionality deprecated in Python 3.12 (https://github.com/ansible-collections/community.docker/pull/834).
+
+Bugfixes
+--------
+
+- docker_compose_v2* - allow ``project_src`` to be a relative path, by converting it to an absolute path before using it (https://github.com/ansible-collections/community.docker/issues/827, https://github.com/ansible-collections/community.docker/pull/828).
+- docker_compose_v2* modules - abort with a nice error message instead of crash when the Docker Compose CLI plugin version is ``dev`` (https://github.com/ansible-collections/community.docker/issues/825, https://github.com/ansible-collections/community.docker/pull/826).
+- inventory plugins - add unsafe wrapper to avoid marking strings that do not contain ``{`` or ``}`` as unsafe, to work around a bug in AWX (https://github.com/ansible-collections/community.docker/pull/835).
+
+v3.8.1
+======
+
+Release Summary
+---------------
+
+Bugfix release
+
+Security Fixes
+--------------
+
+- docker_containers, docker_machine, and docker_swarm inventory plugins - make sure all data received from the Docker daemon / Docker machine is marked as unsafe, so remote code execution by obtaining texts that can be evaluated as templates is not possible (https://www.die-welt.net/2024/03/remote-code-execution-in-ansible-dynamic-inventory-plugins/, https://github.com/ansible-collections/community.docker/pull/815).
+
+Bugfixes
+--------
+
+- docker_compose_v2 - do not fail when non-fatal errors occur. This can happen when pulling an image fails, but then the image can be built for another service. Docker Compose emits an error in that case, but ``docker compose up`` still completes successfully (https://github.com/ansible-collections/community.docker/issues/807, https://github.com/ansible-collections/community.docker/pull/810, https://github.com/ansible-collections/community.docker/pull/811).
+- docker_compose_v2* modules - correctly parse ``Warning`` events emitted by Docker Compose (https://github.com/ansible-collections/community.docker/issues/807, https://github.com/ansible-collections/community.docker/pull/811).
+- docker_compose_v2* modules - parse ``logfmt`` warnings emitted by Docker Compose (https://github.com/ansible-collections/community.docker/issues/787, https://github.com/ansible-collections/community.docker/pull/811).
+- docker_compose_v2_pull - fixing idempotence by checking actual pull progress events instead of service-level pull request when ``policy=always``. This stops the module from reporting ``changed=true`` if no actual change happened when pulling. In check mode, it has to assume that a change happens though (https://github.com/ansible-collections/community.docker/issues/813, https://github.com/ansible-collections/community.docker/pull/814).
+
+v3.8.0
+======
+
+Release Summary
+---------------
+
+Bugfix and feature release.
+
+Minor Changes
+-------------
+
+- docker_compose_v2 - allow to wait until containers are running/health when running ``docker compose up`` with the new ``wait`` option (https://github.com/ansible-collections/community.docker/issues/794, https://github.com/ansible-collections/community.docker/pull/796).
+- docker_container - the ``pull_check_mode_behavior`` option now allows to control the module's behavior in check mode when ``pull=always`` (https://github.com/ansible-collections/community.docker/issues/792, https://github.com/ansible-collections/community.docker/pull/797).
+- docker_container - the ``pull`` option now accepts the three values ``never``, ``missing_image`` (default), and ``never``, next to the previously valid values ``true`` (equivalent to ``always``) and ``false`` (equivalent to ``missing_image``). This allows the equivalent to ``--pull=never`` from the Docker command line (https://github.com/ansible-collections/community.docker/issues/783, https://github.com/ansible-collections/community.docker/pull/797).
+
+Bugfixes
+--------
+
+- docker_compose_v2 - do not consider a ``Waiting`` event as an action/change (https://github.com/ansible-collections/community.docker/pull/804).
+- docker_compose_v2 - do not treat service-level pull events as changes to avoid incorrect ``changed=true`` return value of ``pull=always`` (https://github.com/ansible-collections/community.docker/issues/802, https://github.com/ansible-collections/community.docker/pull/803).
+- docker_compose_v2, docker_compose_v2_pull - fix parsing of pull messages for Docker Compose 2.20.0 (https://github.com/ansible-collections/community.docker/issues/785, https://github.com/ansible-collections/community.docker/pull/786).
+
+v3.7.0
+======
+
+Release Summary
+---------------
+
+Bugfix and feature release.
+
+Minor Changes
+-------------
+
+- docker_compose_v2 - add ``scale`` option to allow to explicitly scale services (https://github.com/ansible-collections/community.docker/pull/776).
+- docker_compose_v2, docker_compose_v2_pull - support ``files`` parameter to specify multiple Compose files (https://github.com/ansible-collections/community.docker/issues/772, https://github.com/ansible-collections/community.docker/pull/775).
+
+Bugfixes
+--------
+
+- docker_compose_v2 - properly parse dry-run build events from ``stderr`` (https://github.com/ansible-collections/community.docker/issues/778, https://github.com/ansible-collections/community.docker/pull/779).
+- docker_compose_v2_pull - the module was documented as part of the ``community.docker.docker`` action group, but was not actually part of it. That has now been fixed (https://github.com/ansible-collections/community.docker/pull/773).
+
+New Modules
+-----------
+
+- community.docker.docker_image_export - Export (archive) Docker images
+
+v3.6.0
+======
+
+Release Summary
+---------------
+
+Bugfix and feature release.
+
+The collection now includes a bunch of new ``docker_image_*`` modules that move features out of the
+rather complex ``docker_image`` module. These new modules are easier to use and can better declare whether
+they support check mode, diff mode, or none of them.
+
+This version also features modules that support the Docker CLI plugins ``buildx`` and ``compose``.
+The ``docker_image_build`` module uses the ``docker buildx`` command under the hood, and the ``docker_compose_v2``
+and ``docker_compose_v2_pull`` modules uses the ``docker compose`` command. All these modules use the Docker CLI
+instead of directly talking to the API. The modules support mostly the same interface as the API based modules,
+so the main difference is that instead of some Python requirements, they depend on the Docker CLI tool ``docker``.
+
+Major Changes
+-------------
+
+- The ``community.docker`` collection now depends on the ``community.library_inventory_filtering_v1`` collection. This utility collection provides host filtering functionality for inventory plugins. If you use the Ansible community package, both collections are included and you do not have to do anything special. If you install the collection with ``ansible-galaxy collection install``, it will be installed automatically. If you install the collection by copying the files of the collection to a place where ansible-core can find it, for example by cloning the git repository, you need to make sure that you also have to install the dependency if you are using the inventory plugins (https://github.com/ansible-collections/community.docker/pull/698).
+
+Minor Changes
+-------------
+
+- The ``ca_cert`` option available to almost all modules and plugins has been renamed to ``ca_path``. The name ``ca_path`` is also used for similar options in ansible-core and other collections. The old name has been added as an alias and can still be used (https://github.com/ansible-collections/community.docker/pull/744).
+- The ``docker_stack*`` modules now use the common CLI-based module code added for the ``docker_image_build`` and ``docker_compose_v2`` modules. This means that the modules now have various more configuration options with respect to talking to the Docker Daemon, and now also are part of the ``community.docker.docker`` and ``docker`` module default groups (https://github.com/ansible-collections/community.docker/pull/745).
+- docker_container - add ``networks[].mac_address`` option for Docker API 1.44+. Note that Docker API 1.44 no longer uses the global ``mac_address`` option, this new option is the only way to set the MAC address for a container (https://github.com/ansible-collections/community.docker/pull/763).
+- docker_image - allow to specify labels and ``/dev/shm`` size when building images (https://github.com/ansible-collections/community.docker/issues/726, https://github.com/ansible-collections/community.docker/pull/727).
+- docker_image - allow to specify memory size and swap memory size in other units than bytes (https://github.com/ansible-collections/community.docker/pull/727).
+- inventory plugins - add ``filter`` option which allows to include and exclude hosts based on Jinja2 conditions (https://github.com/ansible-collections/community.docker/pull/698, https://github.com/ansible-collections/community.docker/issues/610).
+
+Bugfixes
+--------
+
+- Use ``unix:///var/run/docker.sock`` instead of the legacy ``unix://var/run/docker.sock`` as default for ``docker_host`` (https://github.com/ansible-collections/community.docker/pull/736).
+- docker_image - fix archiving idempotency with Docker API 1.44 or later (https://github.com/ansible-collections/community.docker/pull/765).
+
+New Modules
+-----------
+
+- community.docker.docker_compose_v2 - Manage multi-container Docker applications with Docker Compose CLI plugin
+- community.docker.docker_compose_v2_pull - Pull a Docker compose project
+- community.docker.docker_image_build - Build Docker images using Docker buildx
+- community.docker.docker_image_pull - Pull Docker images from registries
+- community.docker.docker_image_push - Push Docker images to registries
+- community.docker.docker_image_remove - Remove Docker images
+- community.docker.docker_image_tag - Tag Docker images with new names and/or tags
+
+v3.5.0
+======
+
+Release Summary
+---------------
+
+Bugfix and feature release.
+
+Minor Changes
+-------------
+
+- docker_container - implement better ``platform`` string comparisons to improve idempotency (https://github.com/ansible-collections/community.docker/issues/654, https://github.com/ansible-collections/community.docker/pull/705).
+- docker_container - internal refactorings which allow comparisons to use more information like details of the current image or the Docker host config (https://github.com/ansible-collections/community.docker/pull/713).
+
+Deprecated Features
+-------------------
+
+- docker_container - the default ``ignore`` for the ``image_name_mismatch`` parameter has been deprecated and will switch to ``recreate`` in community.docker 4.0.0. A deprecation warning will be printed in situations where the default value is used and where a behavior would change once the default changes (https://github.com/ansible-collections/community.docker/pull/703).
+
+Bugfixes
+--------
+
+- modules and plugins using the Docker SDK for Python - remove ``ssl_version`` from the parameters passed to Docker SDK for Python 7.0.0+. Explicitly fail with a nicer error message if it was explicitly set in this case (https://github.com/ansible-collections/community.docker/pull/715).
+- modules and plugins using the Docker SDK for Python - remove ``tls_hostname`` from the parameters passed to Docker SDK for Python 7.0.0+. Explicitly fail with a nicer error message if it was explicitly set in this case (https://github.com/ansible-collections/community.docker/pull/721).
+- vendored Docker SDK for Python - avoid passing on ``ssl_version`` and ``tls_hostname`` if they were not provided by the user. Remove dead code. (https://github.com/ansible-collections/community.docker/pull/722).
+
+v3.4.11
+=======
+
+Release Summary
+---------------
+
+Bugfix release.
+
+Bugfixes
+--------
+
+- docker_volume - fix crash caused by accessing an empty dictionary. The ``has_different_config()`` was raising an ``AttributeError`` because the ``self.existing_volume["Labels"]`` dictionary was ``None`` (https://github.com/ansible-collections/community.docker/pull/702).
+
+v3.4.10
+=======
+
+Release Summary
+---------------
+
+Bugfix release.
+
+Bugfixes
+--------
+
+- docker_swarm - make init and join operations work again with Docker SDK for Python before 4.0.0 (https://github.com/ansible-collections/community.docker/issues/695, https://github.com/ansible-collections/community.docker/pull/696).
+
+v3.4.9
+======
+
+Release Summary
+---------------
+
+Maintenance release with updated documentation and vendored Docker SDK for Python code.
+
+Bugfixes
+--------
+
+- vendored Docker SDK for Python code - cherry-pick changes from the Docker SDK for Python code to align code. These changes should not affect the parts used by the collection's code (https://github.com/ansible-collections/community.docker/pull/694).
+
+v3.4.8
+======
+
+Release Summary
+---------------
+
+Maintenance release with updated documentation.
+
+From this version on, community.docker is using the new `Ansible semantic markup
+<https://docs.ansible.com/ansible/devel/dev_guide/developing_modules_documenting.html#semantic-markup-within-module-documentation>`__
+in its documentation. If you look at documentation with the ansible-doc CLI tool
+from ansible-core before 2.15, please note that it does not render the markup
+correctly. You should be still able to read it in most cases, but you need
+ansible-core 2.15 or later to see it as it is intended. Alternatively you can
+look at `the devel docsite <https://docs.ansible.com/ansible/devel/collections/community/docker/>`__
+for the rendered HTML version of the documentation of the latest release.
+
+Known Issues
+------------
+
+- Ansible markup will show up in raw form on ansible-doc text output for ansible-core before 2.15. If you have trouble deciphering the documentation markup, please upgrade to ansible-core 2.15 (or newer), or read the HTML documentation on https://docs.ansible.com/ansible/devel/collections/community/docker/.
+
+v3.4.7
+======
+
+Release Summary
+---------------
+
+Bugfix release.
+
+Bugfixes
+--------
+
+- docker_swarm_info - if ``service=true`` is used, do not crash when a service without an endpoint spec is encountered (https://github.com/ansible-collections/community.docker/issues/636, https://github.com/ansible-collections/community.docker/pull/637).
+
+v3.4.6
+======
+
+Release Summary
+---------------
+
+Bugfix release with documentation warnings about using certain functionality when connecting to the Docker daemon with TCP TLS.
+
+Bugfixes
+--------
+
+- socket_handler module utils - make sure this fully works when Docker SDK for Python is not available (https://github.com/ansible-collections/community.docker/pull/620).
+- vendored Docker SDK for Python code - fix for errors on pipe close in Windows (https://github.com/ansible-collections/community.docker/pull/619).
+- vendored Docker SDK for Python code - respect timeouts on Windows named pipes (https://github.com/ansible-collections/community.docker/pull/619).
+- vendored Docker SDK for Python code - use ``poll()`` instead of ``select()`` except on Windows (https://github.com/ansible-collections/community.docker/pull/619).
+
+Known Issues
+------------
+
+- docker_api connection plugin - does **not work with TCP TLS sockets**! This is caused by the inability to send an ``close_notify`` TLS alert without closing the connection with Python's ``SSLSocket`` (https://github.com/ansible-collections/community.docker/issues/605, https://github.com/ansible-collections/community.docker/pull/621).
+- docker_container_exec - does **not work with TCP TLS sockets** when the ``stdin`` option is used! This is caused by the inability to send an ``close_notify`` TLS alert without closing the connection with Python's ``SSLSocket`` (https://github.com/ansible-collections/community.docker/issues/605, https://github.com/ansible-collections/community.docker/pull/621).
+
+v3.4.5
+======
+
+Release Summary
+---------------
+
+Maintenance release which adds compatibility with requests 2.29.0 and 2.30.0 and urllib3 2.0.
+
+Bugfixes
+--------
+
+- Make vendored Docker SDK for Python code compatible with requests 2.29.0 and urllib3 2.0 (https://github.com/ansible-collections/community.docker/pull/613).
+
+v3.4.4
+======
+
+Release Summary
+---------------
+
+Maintenance release with updated EE requirements and updated documentation.
+
+Minor Changes
+-------------
+
+- Restrict requests to versions before 2.29.0, and urllib3 to versions before 2.0.0. This is necessary until the vendored code from Docker SDK for Python has been fully adjusted to work with a feature of urllib3 that is used since requests 2.29.0 (https://github.com/ansible-collections/community.docker/issues/611, https://github.com/ansible-collections/community.docker/pull/612).
+
+Known Issues
+------------
+
+- The modules and plugins using the vendored code from Docker SDK for Python currently do not work with requests 2.29.0 and/or urllib3 2.0.0. The same is currently true for the latest version of Docker SDK for Python itself (https://github.com/ansible-collections/community.docker/issues/611, https://github.com/ansible-collections/community.docker/pull/612).
+
+v3.4.3
+======
+
+Release Summary
+---------------
+
+Maintenance release with improved documentation.
+
+v3.4.2
+======
+
+Release Summary
+---------------
+
+Bugfix release.
+
+Bugfixes
+--------
+
+- docker_prune - return correct value for ``changed``. So far the module always claimed that nothing changed (https://github.com/ansible-collections/community.docker/pull/593).
+
+v3.4.1
+======
+
+Release Summary
+---------------
+
+Regular bugfix release.
+
+Bugfixes
+--------
+
+- docker_api connection plugin, docker_container_exec, docker_container_copy_into - properly close socket to Daemon after executing commands in containers (https://github.com/ansible-collections/community.docker/pull/582).
+- docker_container - fix ``tmfs_size`` and ``tmpfs_mode`` not being set (https://github.com/ansible-collections/community.docker/pull/580).
+- various plugins and modules - remove unnecessary imports (https://github.com/ansible-collections/community.docker/pull/574).
 
 v3.4.0
 ======
@@ -30,7 +435,7 @@ Bugfixes
 New Modules
 -----------
 
-- docker_container_copy_into - Copy a file into a Docker container
+- community.docker.docker_container_copy_into - Copy a file into a Docker container
 
 v3.3.2
 ======
@@ -198,7 +603,7 @@ Minor Changes
 - docker_container - allow to specify ``platform`` (https://github.com/ansible-collections/community.docker/issues/123, https://github.com/ansible-collections/community.docker/pull/426).
 - modules and plugins communicating directly with the Docker daemon - improve default TLS version selection for Python 3.6 and newer. This is only a change relative to older community.docker 3.0.0 pre-releases or with respect to Docker SDK for Python < 6.0.0. Docker SDK for Python 6.0.0 will also include this change (https://github.com/ansible-collections/community.docker/pull/434).
 - modules and plugins communicating directly with the Docker daemon - simplify use of helper function that was removed in Docker SDK for Python to find executables (https://github.com/ansible-collections/community.docker/pull/438).
-- socker_handler and socket_helper module utils - improve Python forward compatibilty, create helper functions for file blocking/unblocking (https://github.com/ansible-collections/community.docker/pull/415).
+- socker_handler and socket_helper module utils - improve Python forward compatibility, create helper functions for file blocking/unblocking (https://github.com/ansible-collections/community.docker/pull/415).
 
 Breaking Changes / Porting Guide
 --------------------------------
@@ -391,7 +796,7 @@ Minor Changes
 Bugfixes
 --------
 
-- docker_container, docker_image - adjust image finding code to pecularities of ``podman-docker``'s API emulation when Docker short names like ``redis`` are used (https://github.com/ansible-collections/community.docker/issues/292).
+- docker_container, docker_image - adjust image finding code to peculiarities of ``podman-docker``'s API emulation when Docker short names like ``redis`` are used (https://github.com/ansible-collections/community.docker/issues/292).
 
 v2.1.1
 ======
@@ -440,7 +845,7 @@ Bugfixes
 
 - docker_api connection plugin - avoid passing an unnecessary argument to a Docker SDK for Python call that is only supported by version 3.0.0 or later (https://github.com/ansible-collections/community.docker/pull/243).
 - docker_container_exec - ``chdir`` is only supported since Docker SDK for Python 3.0.0. Make sure that this option can only use when 3.0.0 or later is installed, and prevent passing this parameter on when ``chdir`` is not provided to this module (https://github.com/ansible-collections/community.docker/pull/243, https://github.com/ansible-collections/community.docker/issues/242).
-- nsenter connection plugin - ensure the ``nsenter_pid`` option is retrieved in ``_connect`` instead of ``__init__`` to prevent a crasher due to bad initialization order (https://github.com/ansible-collections/community.docker/pull/249).
+- nsenter connection plugin - ensure the ``nsenter_pid`` option is retrieved in ``_connect`` instead of ``__init__`` to prevent a crash due to bad initialization order (https://github.com/ansible-collections/community.docker/pull/249).
 - nsenter connection plugin - replace the use of ``--all-namespaces`` with specific namespaces to support compatibility with Busybox nsenter (used on, for example, Alpine containers) (https://github.com/ansible-collections/community.docker/pull/249).
 
 v2.0.1
@@ -462,7 +867,7 @@ New major release with some deprecations removed and a breaking change in the ``
 Breaking Changes / Porting Guide
 --------------------------------
 
-- docker_compose - fixed ``timeout`` defaulting behavior so that ``stop_grace_period``, if defined in the compose file, will be used if `timeout`` is not specified (https://github.com/ansible-collections/community.docker/pull/163).
+- docker_compose - fixed ``timeout`` defaulting behavior so that ``stop_grace_period``, if defined in the compose file, will be used if ``timeout`` is not specified (https://github.com/ansible-collections/community.docker/pull/163).
 
 Deprecated Features
 -------------------
@@ -541,7 +946,7 @@ New Plugins
 Connection
 ~~~~~~~~~~
 
-- nsenter - execute on host running controller container
+- community.docker.nsenter - execute on host running controller container
 
 v1.8.0
 ======
@@ -638,7 +1043,7 @@ Bugfixes
 New Modules
 -----------
 
-- docker_container_exec - Execute command in a docker container
+- community.docker.docker_container_exec - Execute command in a docker container
 
 v1.4.0
 ======
@@ -690,15 +1095,15 @@ Bugfixes
 
 - docker_container - fix healthcheck disabling idempotency issue with strict comparison (https://github.com/ansible-collections/community.docker/issues/85).
 - docker_image - prevent module failure when removing image that is removed between inspection and removal (https://github.com/ansible-collections/community.docker/pull/87).
-- docker_image - prevent module failure when removing non-existant image by ID (https://github.com/ansible-collections/community.docker/pull/87).
+- docker_image - prevent module failure when removing non-existent image by ID (https://github.com/ansible-collections/community.docker/pull/87).
 - docker_image_info - prevent module failure when image vanishes between listing and inspection (https://github.com/ansible-collections/community.docker/pull/87).
-- docker_image_info - prevent module failure when querying non-existant image by ID (https://github.com/ansible-collections/community.docker/pull/87).
+- docker_image_info - prevent module failure when querying non-existent image by ID (https://github.com/ansible-collections/community.docker/pull/87).
 
 New Modules
 -----------
 
-- docker_image_load - Load docker image(s) from archives
-- docker_plugin - Manage Docker plugins
+- community.docker.docker_image_load - Load docker image(s) from archives
+- community.docker.docker_plugin - Manage Docker plugins
 
 v1.2.2
 ======
@@ -778,17 +1183,17 @@ New Plugins
 Connection
 ~~~~~~~~~~
 
-- docker_api - Run tasks in docker containers
+- community.docker.docker_api - Run tasks in docker containers
 
 Inventory
 ~~~~~~~~~
 
-- docker_containers - Ansible dynamic inventory plugin for Docker containers.
+- community.docker.docker_containers - Ansible dynamic inventory plugin for Docker containers.
 
 New Modules
 -----------
 
-- current_container_facts - Return facts about whether the module runs in a Docker container
+- community.docker.current_container_facts - Return facts about whether the module runs in a Docker container
 
 v1.0.1
 ======
@@ -811,7 +1216,6 @@ Release Summary
 
 This is the first production (non-prerelease) release of ``community.docker``.
 
-
 Minor Changes
 -------------
 
@@ -828,7 +1232,6 @@ Release Summary
 The ``community.docker`` continues the work on the Ansible docker modules and plugins from their state in ``community.general`` 1.2.0. The changes listed here are thus relative to the modules and plugins ``community.general.docker*``.
 
 All deprecation removals planned for ``community.general`` 2.0.0 have been applied. All deprecation removals scheduled for ``community.general`` 3.0.0 have been re-scheduled for ``community.docker`` 2.0.0.
-
 
 Minor Changes
 -------------
@@ -847,7 +1250,7 @@ Removed Features (previously deprecated)
 - docker_image - the ``source`` option is now mandatory (https://github.com/ansible-collections/community.docker/pull/1).
 - docker_image - the ``use_tls`` option has been removed. Use ``tls`` and ``validate_certs`` instead (https://github.com/ansible-collections/community.docker/pull/1).
 - docker_image - the default of the ``build.pull`` option changed to ``false`` (https://github.com/ansible-collections/community.docker/pull/1).
-- docker_image_facts - this alias is on longer availabe, use ``docker_image_info`` instead (https://github.com/ansible-collections/community.docker/pull/1).
+- docker_image_facts - this alias is on longer available, use ``docker_image_info`` instead (https://github.com/ansible-collections/community.docker/pull/1).
 - docker_network - no longer returns ``ansible_facts`` (https://github.com/ansible-collections/community.docker/pull/1).
 - docker_network - the ``ipam_options`` option has been removed. Use ``ipam_config`` instead (https://github.com/ansible-collections/community.docker/pull/1).
 - docker_service - no longer returns ``ansible_facts`` (https://github.com/ansible-collections/community.docker/pull/1).

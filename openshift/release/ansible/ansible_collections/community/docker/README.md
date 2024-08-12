@@ -9,6 +9,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 [![Doc](https://img.shields.io/badge/docs-brightgreen.svg)](https://docs.ansible.com/ansible/latest/collections/community/docker/)
 [![Build Status](https://dev.azure.com/ansible/community.docker/_apis/build/status/CI?branchName=main)](https://dev.azure.com/ansible/community.docker/_build?definitionId=25)
 [![Codecov](https://img.shields.io/codecov/c/github/ansible-collections/community.docker)](https://codecov.io/gh/ansible-collections/community.docker)
+[![REUSE status](https://api.reuse.software/badge/github.com/ansible-collections/community.docker)](https://api.reuse.software/info/github.com/ansible-collections/community.docker)
 
 This repo contains the `community.docker` Ansible Collection. The collection includes many modules and plugins to work with Docker.
 
@@ -16,7 +17,7 @@ Please note that this collection does **not** support Windows targets. The conne
 
 ## Tested with Ansible
 
-Tested with the current ansible-core 2.11, ansible-core 2.12, ansible-core 2.13, and ansible-core 2.14 releases, and the current development version of ansible-core. Ansible/ansible-base versions before 2.11.0 are not supported.
+Tested with the current ansible-core 2.11, ansible-core 2.12, ansible-core 2.13, ansible-core 2.14, ansible-core 2.15, ansible-core 2.16, and ansible-core 2.17 releases, and the current development version of ansible-core. Ansible/ansible-base versions before 2.11.0 are not supported.
 
 Please note that Ansible 2.9 and ansible-base 2.10 are no longer supported. If you need to use them, use community.docker 2.x.y. Also note that this collection does not work with ansible-core 2.11 (this includes ansible-base and Ansible 2.9) on Python 3.12+.
 
@@ -62,8 +63,14 @@ If you use the Ansible package and do not update collections independently, use 
     - community.docker.docker_container_info: retrieve information on Docker containers
     - community.docker.docker_host_info: retrieve information on the Docker daemon
     - community.docker.docker_image: manage Docker images
+    - community.docker.docker_image_build: build Docker images using Docker buildx
+    - community.docker.docker_image_export: export (archive) Docker images
     - community.docker.docker_image_info: retrieve information on Docker images
     - community.docker.docker_image_load: load Docker images from archives
+    - community.docker.docker_image_pull: pull Docker images from registries
+    - community.docker.docker_image_push: push Docker images to registries
+    - community.docker.docker_image_remove: remove Docker images
+    - community.docker.docker_image_tag: tag Docker images with new names and/or tags
     - community.docker.docker_login: log in and out to/from registries
     - community.docker.docker_network: manage Docker networks
     - community.docker.docker_network_info: retrieve information on Docker networks
@@ -72,7 +79,9 @@ If you use the Ansible package and do not update collections independently, use 
     - community.docker.docker_volume: manage Docker volumes
     - community.docker.docker_volume_info: retrieve information on Docker volumes
   * Docker Compose:
-    - community.docker.docker_compose: manage Docker Compose files
+    - community.docker.docker_compose: manage Docker Compose files (legacy Docker Compose v1; the module is deprecated and will be removed from community.docker 4.0.0)
+    - community.docker.docker_compose_v2: manage Docker Compose files (Docker compose CLI plugin)
+    - community.docker.docker_compose_v2_pull: pull a Docker compose project
   * Docker Swarm:
     - community.docker.docker_config: manage configurations
     - community.docker.docker_node: manage Docker Swarm nodes
@@ -112,7 +121,7 @@ You can find more information in the [developer guide for collections](https://d
 
 ## Release notes
 
-See the [changelog](https://github.com/ansible-collections/community.docker/tree/main/CHANGELOG.rst).
+See the [changelog](https://github.com/ansible-collections/community.docker/tree/main/CHANGELOG.md).
 
 ## More information
 

@@ -394,6 +394,10 @@ class APIClient(
             yield out
 
     def _read_from_socket(self, response, stream, tty=True, demux=False):
+        """Consume all data from the socket, close the response and return the
+        data. If stream=True, then a generator is returned instead and the
+        caller is responsible for closing the response.
+        """
         socket = self._get_raw_response_socket(response)
 
         gen = frames_iter(socket, tty)
@@ -408,8 +412,11 @@ class APIClient(
         if stream:
             return gen
         else:
-            # Wait for all the frames, concatenate them, and return the result
-            return consume_socket_output(gen, demux=demux)
+            try:
+                # Wait for all the frames, concatenate them, and return the result
+                return consume_socket_output(gen, demux=demux)
+            finally:
+                response.close()
 
     def _disable_socket_timeout(self, socket):
         """ Depending on the combination of python version and whether we're
@@ -448,7 +455,7 @@ class APIClient(
         return self._get_result_tty(stream, res, self._check_is_tty(container))
 
     def _get_result_tty(self, stream, res, is_tty):
-        # We should also use raw streaming (without keep-alives)
+        # We should also use raw streaming (without keep-alive)
         # if we're dealing with a tty-enabled container.
         if is_tty:
             return self._stream_raw_result(res) if stream else \
