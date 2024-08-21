@@ -4,10 +4,7 @@
 # More info: https://book.kubebuilder.io/reference/project-config.html
 domain: example.com
 layout:
-- ansible.sdk.operatorframework.io/v1
-plugins:
-  manifests.sdk.operatorframework.io/v2: {}
-  scorecard.sdk.operatorframework.io/v2: {}
+- go.kubebuilder.io/v1
 projectName: memcached-operator
 resources:
 - api:

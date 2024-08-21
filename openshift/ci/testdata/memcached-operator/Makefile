@@ -24,6 +24,11 @@ help: ## Display this help.
 
 ##@ Build
 
+.PHONY: run
+ANSIBLE_ROLES_PATH?="$(shell pwd)/roles"
+run: ansible-operator ## Run against the configured Kubernetes cluster in ~/.kube/config
+	$(ANSIBLE_OPERATOR) run
+
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
 	docker build -t ${IMG} .
@@ -40,14 +45,11 @@ docker-push: ## Push docker image with the manager.
 # To properly provided solutions that supports more than one platform you should use this option.
 PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
 .PHONY: docker-buildx
-docker-buildx: test ## Build and push docker image for the manager for cross-platform support
-	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
-	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
+docker-buildx: ## Build and push docker image for the manager for cross-platform support
 	- docker buildx create --name project-v3-builder
 	docker buildx use project-v3-builder
-	- docker buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross .
+	- docker buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile .
 	- docker buildx rm project-v3-builder
-	rm Dockerfile.cross
 
 ##@ Deployment
 
@@ -79,10 +81,26 @@ ifeq (,$(shell which kustomize 2>/dev/null))
 	@{ \
 	set -e ;\
 	mkdir -p $(dir $(KUSTOMIZE)) ;\
-	curl -sSLo - https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/v4.5.7/kustomize_v4.5.7_$(OS)_$(ARCH).tar.gz | \
+	curl -sSLo - https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/v5.3.0/kustomize_v5.3.0_$(OS)_$(ARCH).tar.gz | \
 	tar xzf - -C bin/ ;\
 	}
 else
 KUSTOMIZE = $(shell which kustomize)
+endif
+endif
+
+.PHONY: ansible-operator
+ANSIBLE_OPERATOR = $(shell pwd)/bin/ansible-operator
+ansible-operator: ## Download ansible-operator locally if necessary, preferring the $(pwd)/bin path over global if both exist.
+ifeq (,$(wildcard $(ANSIBLE_OPERATOR)))
+ifeq (,$(shell which ansible-operator 2>/dev/null))
+	@{ \
+	set -e ;\
+	mkdir -p $(dir $(ANSIBLE_OPERATOR)) ;\
+	curl -sSLo $(ANSIBLE_OPERATOR) https://github.com/operator-framework/ansible-operator-plugins/releases/download/v1.35.0/ansible-operator_$(OS)_$(ARCH) ;\
+	chmod +x $(ANSIBLE_OPERATOR) ;\
+	}
+else
+ANSIBLE_OPERATOR = $(shell which ansible-operator)
 endif
 endif
