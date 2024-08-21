@@ -49,9 +49,9 @@ func main() {
 	}
 
 	// samplesPath is the path where all samples should be generated
-	samplesPath := filepath.Join(wd, "openshift", "ci", "testdata")
+	samplesPath := filepath.Join(wd, "testdata")
 	log.Infof("writing sample directories under %s", samplesPath)
 
 	log.Infof("creating Ansible Memcached Sample")
-	ansible.GenerateMemcachedSamples(samplesPath)
+	ansible.GenerateMoleculeSample(samplesPath)
 }

@@ -138,7 +138,7 @@ EOF
 }
 
 # use sample in testdata
-pushd $ROOTDIR/openshift/ci/testdata/memcached-operator
+pushd $ROOTDIR/openshift/ci/testdata/ansible/memcached-operator
 ls
 
 # deploy operator
