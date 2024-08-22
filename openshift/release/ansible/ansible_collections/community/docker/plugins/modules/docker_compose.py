@@ -12,13 +12,19 @@ DOCUMENTATION = '''
 
 module: docker_compose
 
-short_description: Manage multi-container Docker applications with Docker Compose.
+short_description: Manage multi-container Docker applications with Docker Compose V1
+
+deprecated:
+  removed_in: 4.0.0
+  why: This module uses docker-compose v1, which is End of Life since July 2022.
+  alternative: Migrate to M(community.docker.docker_compose_v2)
 
 author: "Chris Houseknecht (@chouseknecht)"
 
 description:
   - Uses Docker Compose to start, shutdown and scale services. B(This module requires docker-compose < 2.0.0.)
-  - Configuration can be read from a C(docker-compose.yml) or C(docker-compose.yaml) file or inline using the I(definition) option.
+    Use the M(community.docker.docker_compose_v2) module for using the modern Docker compose CLI plugin.
+  - Configuration can be read from a C(docker-compose.yml) or C(docker-compose.yaml) file or inline using the O(definition) option.
   - See the examples for more details.
   - Supports check mode.
   - This module was called C(docker_service) before Ansible 2.8. The usage did not change.
@@ -39,27 +45,27 @@ options:
   project_src:
     description:
       - Path to a directory containing a C(docker-compose.yml) or C(docker-compose.yaml) file.
-      - Mutually exclusive with I(definition).
-      - Required when no I(definition) is provided.
+      - Mutually exclusive with O(definition).
+      - Required when no O(definition) is provided.
     type: path
   project_name:
     description:
-      - Provide a project name. If not provided, the project name is taken from the basename of I(project_src).
-      - Required when I(definition) is provided.
+      - Provide a project name. If not provided, the project name is taken from the basename of O(project_src).
+      - Required when O(definition) is provided.
     type: str
   env_file:
     description:
-      - By default environment files are loaded from a C(.env) file located directly under the I(project_src) directory.
-      - I(env_file) can be used to specify the path of a custom environment file instead.
-      - The path is relative to the I(project_src) directory.
+      - By default environment files are loaded from a C(.env) file located directly under the O(project_src) directory.
+      - O(env_file) can be used to specify the path of a custom environment file instead.
+      - The path is relative to the O(project_src) directory.
       - Requires C(docker-compose) version 1.25.0 or greater.
       - "Note: C(docker-compose) versions C(<=1.28) load the env file from the current working directory of the
-          C(docker-compose) command rather than I(project_src)."
+          C(docker-compose) command rather than O(project_src)."
     type: path
     version_added: 1.9.0
   files:
     description:
-      - List of Compose file names relative to I(project_src). Overrides C(docker-compose.yml) or C(docker-compose.yaml).
+      - List of Compose file names relative to O(project_src). Overrides C(docker-compose.yml) or C(docker-compose.yaml).
       - Files are loaded and merged in the order given.
     type: list
     elements: path
@@ -74,9 +80,9 @@ options:
   state:
     description:
       - Desired state of the project.
-      - Specifying C(present) is the same as running C(docker-compose up) resp. C(docker-compose stop) (with I(stopped)) resp. C(docker-compose restart)
-        (with I(restarted)).
-      - Specifying C(absent) is the same as running C(docker-compose down).
+      - Specifying V(present) is the same as running C(docker-compose up) resp. C(docker-compose stop) (with O(stopped=true)) resp. C(docker-compose restart)
+        (with O(restarted=true)).
+      - Specifying V(absent) is the same as running C(docker-compose down).
     type: str
     default: present
     choices:
@@ -84,25 +90,25 @@ options:
       - present
   services:
     description:
-      - When I(state) is C(present) run C(docker-compose up) resp. C(docker-compose stop) (with I(stopped)) resp. C(docker-compose restart) (with I(restarted))
-        on a subset of services.
-      - If empty, which is the default, the operation will be performed on all services defined in the Compose file (or inline I(definition)).
+      - When O(state) is V(present) run C(docker-compose up) resp. C(docker-compose stop) (with O(stopped=true)) resp.
+        C(docker-compose restart) (with O(restarted=true)) on a subset of services.
+      - If empty, which is the default, the operation will be performed on all services defined in the Compose file (or inline O(definition)).
     type: list
     elements: str
   scale:
     description:
-      - When I(state) is C(present) scale services. Provide a dictionary of key/value pairs where the key
+      - When O(state) is V(present) scale services. Provide a dictionary of key/value pairs where the key
         is the name of the service and the value is an integer count for the number of containers.
     type: dict
   dependencies:
     description:
-      - When I(state) is C(present) specify whether or not to include linked services.
+      - When O(state) is V(present) specify whether or not to include linked services.
     type: bool
     default: true
   definition:
     description:
       - Compose file describing one or more services, networks and volumes.
-      - Mutually exclusive with I(project_src) and I(files).
+      - Mutually exclusive with O(project_src) and O(files).
     type: dict
   hostname_check:
     description:
@@ -112,8 +118,8 @@ options:
   recreate:
     description:
       - By default containers will be recreated when their configuration differs from the service definition.
-      - Setting to C(never) ignores configuration differences and leaves existing containers unchanged.
-      - Setting to C(always) forces recreation of all existing containers.
+      - Setting to V(never) ignores configuration differences and leaves existing containers unchanged.
+      - Setting to V(always) forces recreation of all existing containers.
     type: str
     default: smart
     choices:
@@ -122,49 +128,49 @@ options:
       - smart
   build:
     description:
-      - Use with I(state) C(present) to always build images prior to starting the application.
+      - Use with O(state=present) to always build images prior to starting the application.
       - Same as running C(docker-compose build) with the pull option.
       - Images will only be rebuilt if Docker detects a change in the Dockerfile or build directory contents.
-      - Use the I(nocache) option to ignore the image cache when performing the build.
-      - If an existing image is replaced, services using the image will be recreated unless I(recreate) is C(never).
+      - Use the O(nocache) option to ignore the image cache when performing the build.
+      - If an existing image is replaced, services using the image will be recreated unless O(recreate=never).
     type: bool
     default: false
   pull:
     description:
-      - Use with I(state) C(present) to always pull images prior to starting the application.
+      - Use with O(state=present) to always pull images prior to starting the application.
       - Same as running C(docker-compose pull).
-      - When a new image is pulled, services using the image will be recreated unless I(recreate) is C(never).
+      - When a new image is pulled, services using the image will be recreated unless O(recreate=never).
     type: bool
     default: false
   nocache:
     description:
-      - Use with the I(build) option to ignore the cache during the image build process.
+      - Use with the O(build) option to ignore the cache during the image build process.
     type: bool
     default: false
   remove_images:
     description:
-      - Use with I(state) C(absent) to remove all images or only local images.
+      - Use with O(state=absent) to remove all images or only local images.
     type: str
     choices:
         - 'all'
         - 'local'
   remove_volumes:
     description:
-      - Use with I(state) C(absent) to remove data volumes.
+      - Use with O(state=absent) to remove data volumes.
     type: bool
     default: false
   stopped:
     description:
-      - Use with I(state) C(present) to stop all containers defined in the Compose file.
-      - If I(services) is defined, only the containers listed there will be stopped.
+      - Use with O(state=present) to stop all containers defined in the Compose file.
+      - If O(services) is defined, only the containers listed there will be stopped.
       - Requires C(docker-compose) version 1.17.0 or greater for full support. For older versions, the services will
         first be started and then stopped when the service is supposed to be created as stopped.
     type: bool
     default: false
   restarted:
     description:
-      - Use with I(state) C(present) to restart all containers defined in the Compose file.
-      - If I(services) is defined, only the containers listed there will be restarted.
+      - Use with O(state=present) to restart all containers defined in the Compose file.
+      - If O(services) is defined, only the containers listed there will be restarted.
     type: bool
     default: false
   remove_orphans:
@@ -175,8 +181,8 @@ options:
   timeout:
     description:
       - Timeout in seconds for container shutdown when attached or when containers are already running.
-      - By default C(compose) will use a C(10s) timeout unless C(default_grace_period) is defined for a
-        particular service in the I(project_src).
+      - By default C(docker-compose) will use a V(10) seconds timeout unless C(default_grace_period) is defined for a
+        particular service in the O(project_src).
     type: int
     default: null
   use_ssh_client:
@@ -184,10 +190,13 @@ options:
       - Currently ignored for this module, but might suddenly be supported later on.
 
 requirements:
-  - "L(Docker SDK for Python,https://docker-py.readthedocs.io/en/stable/) >= 1.8.0"
+  - "L(Docker SDK for Python,https://docker-py.readthedocs.io/en/stable/) >= 1.8.0, < 7. Docker SDK for Python 7+ is incompatible to docker-compose v1."
   - "docker-compose >= 1.7.0, < 2.0.0"
   - "Docker API >= 1.25"
   - "PyYAML >= 3.11"
+
+seealso:
+  - module: community.docker.docker_compose_v2
 '''
 
 EXAMPLES = '''
@@ -208,7 +217,8 @@ EXAMPLES = '''
         project_src: flask
       register: output
 
-    - ansible.builtin.debug:
+    - name: Show results
+      ansible.builtin.debug:
         var: output
 
     - name: Run `docker-compose up` again
@@ -217,7 +227,8 @@ EXAMPLES = '''
         build: false
       register: output
 
-    - ansible.builtin.debug:
+    - name: Show results
+      ansible.builtin.debug:
         var: output
 
     - ansible.builtin.assert:
@@ -230,13 +241,15 @@ EXAMPLES = '''
         stopped: true
       register: output
 
-    - ansible.builtin.debug:
+    - name: Show results
+      ansible.builtin.debug:
         var: output
 
-    - ansible.builtin.assert:
+    - name: Verify that web and db services are not running
+      ansible.builtin.assert:
         that:
-          - "not web.flask_web_1.state.running"
-          - "not db.flask_db_1.state.running"
+          - "not output.services.web.flask_web_1.state.running"
+          - "not output.services.db.flask_db_1.state.running"
 
     - name: Restart services
       community.docker.docker_compose:
@@ -245,25 +258,29 @@ EXAMPLES = '''
         restarted: true
       register: output
 
-    - ansible.builtin.debug:
+    - name: Show results
+      ansible.builtin.debug:
         var: output
 
-    - ansible.builtin.assert:
+    - name: Verify that web and db services are running
+      ansible.builtin.assert:
         that:
-          - "web.flask_web_1.state.running"
-          - "db.flask_db_1.state.running"
+          - "output.services.web.flask_web_1.state.running"
+          - "output.services.db.flask_db_1.state.running"
 
 - name: Scale the web service to 2
   hosts: localhost
   gather_facts: false
   tasks:
-    - community.docker.docker_compose:
+    - name: Scale the web service to two instances
+      community.docker.docker_compose:
         project_src: flask
         scale:
           web: 2
       register: output
 
-    - ansible.builtin.debug:
+    - name: Show results
+      ansible.builtin.debug:
         var: output
 
 - name: Run with inline Compose file version 2
@@ -271,11 +288,13 @@ EXAMPLES = '''
   hosts: localhost
   gather_facts: false
   tasks:
-    - community.docker.docker_compose:
+    - name: Remove flask project
+      community.docker.docker_compose:
         project_src: flask
         state: absent
 
-    - community.docker.docker_compose:
+    - name: Start flask project with inline definition
+      community.docker.docker_compose:
         project_name: flask
         definition:
           version: '2'
@@ -293,24 +312,28 @@ EXAMPLES = '''
                 - db
       register: output
 
-    - ansible.builtin.debug:
+    - name: Show results
+      ansible.builtin.debug:
         var: output
 
-    - ansible.builtin.assert:
+    - name: Verify that the db and web services are running
+      ansible.builtin.assert:
         that:
-          - "web.flask_web_1.state.running"
-          - "db.flask_db_1.state.running"
+          - "output.services.web.flask_web_1.state.running"
+          - "output.services.db.flask_db_1.state.running"
 
 - name: Run with inline Compose file version 1
   # https://docs.docker.com/compose/compose-file/compose-file-v1/
   hosts: localhost
   gather_facts: false
   tasks:
-    - community.docker.docker_compose:
+    - name: Remove flask project
+      community.docker.docker_compose:
         project_src: flask
         state: absent
 
-    - community.docker.docker_compose:
+    - name: Start flask project with inline definition
+      community.docker.docker_compose:
         project_name: flask
         definition:
             db:
@@ -326,13 +349,15 @@ EXAMPLES = '''
                 - db
       register: output
 
-    - ansible.builtin.debug:
+    - name: Show results
+      ansible.builtin.debug:
         var: output
 
-    - ansible.builtin.assert:
+    - name: Verify that web and db services are running
+      ansible.builtin.assert:
         that:
-          - "web.flask_web_1.state.running"
-          - "db.flask_db_1.state.running"
+          - "output.services.web.flask_web_1.state.running"
+          - "output.services.db.flask_db_1.state.running"
 '''
 
 RETURN = '''
@@ -424,7 +449,7 @@ services:
 
 actions:
   description: Provides the actions to be taken on each service as determined by compose.
-  returned: when in check mode or I(debug) is C(true)
+  returned: when in check mode or O(debug=true)
   type: complex
   contains:
       service_name:

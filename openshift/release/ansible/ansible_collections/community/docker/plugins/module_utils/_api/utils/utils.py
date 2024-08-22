@@ -17,7 +17,6 @@ import os
 import os.path
 import shlex
 import string
-from datetime import datetime
 from ansible_collections.community.docker.plugins.module_utils.version import StrictVersion
 
 from ansible.module_utils.six import PY2, PY3, binary_type, integer_types, iteritems, string_types, text_type
@@ -159,6 +158,22 @@ def convert_volume_binds(binds):
                 mode = v['mode']
             else:
                 mode = 'rw'
+
+            # NOTE: this is only relevant for Linux hosts
+            # (doesn't apply in Docker Desktop)
+            propagation_modes = [
+                'rshared',
+                'shared',
+                'rslave',
+                'slave',
+                'rprivate',
+                'private',
+            ]
+            if 'propagation' in v and v['propagation'] in propagation_modes:
+                if mode:
+                    mode = ','.join([mode, v['propagation']])
+                else:
+                    mode = v['propagation']
 
             result.append(
                 text_type('{0}:{1}:{2}').format(k, bind, mode)
@@ -403,12 +418,6 @@ def convert_filters(filters):
             for item in v
         ]
     return json.dumps(result)
-
-
-def datetime_to_timestamp(dt):
-    """Convert a UTC datetime to a Unix timestamp"""
-    delta = dt - datetime.utcfromtimestamp(0)
-    return delta.seconds + delta.days * 24 * 3600
 
 
 def parse_bytes(s):

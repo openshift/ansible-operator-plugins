@@ -81,9 +81,34 @@ options:
       - Whether to prune the builder cache.
     type: bool
     default: false
+  builder_cache_all:
+    description:
+      - Whether to remove all types of build cache.
+    type: bool
+    default: false
+    version_added: 3.10.0
+  builder_cache_filters:
+    description:
+      - A dictionary of filter values used for selecting images to delete.
+      - "For example, C(until: 10m)."
+      - See L(the API documentation,https://docs.docker.com/engine/api/v1.44/#tag/Image/operation/BuildPrune)
+        for more information on possible filters.
+    type: dict
+    version_added: 3.10.0
+  builder_cache_keep_storage:
+    description:
+      - Amount of disk space to keep for cache in format C(<number>[<unit>])."
+      - "Number is a positive integer. Unit can be one of V(B) (byte), V(K) (kibibyte, 1024B), V(M) (mebibyte), V(G) (gibibyte),
+        V(T) (tebibyte), or V(P) (pebibyte)."
+      - "Omitting the unit defaults to bytes."
+    type: str
+    version_added: 3.10.0
 
 author:
   - "Felix Fontein (@felixfontein)"
+
+notes:
+  - The module always returned C(changed=false) before community.docker 3.5.1.
 
 requirements:
   - "Docker API >= 1.25"
@@ -121,14 +146,14 @@ RETURN = '''
 containers:
     description:
       - List of IDs of deleted containers.
-    returned: I(containers) is C(true)
+    returned: O(containers=true)
     type: list
     elements: str
     sample: []
 containers_space_reclaimed:
     description:
       - Amount of reclaimed disk space from container pruning in bytes.
-    returned: I(containers) is C(true)
+    returned: O(containers=true)
     type: int
     sample: 0
 
@@ -136,14 +161,14 @@ containers_space_reclaimed:
 images:
     description:
       - List of IDs of deleted images.
-    returned: I(images) is C(true)
+    returned: O(images=true)
     type: list
     elements: str
     sample: []
 images_space_reclaimed:
     description:
       - Amount of reclaimed disk space from image pruning in bytes.
-    returned: I(images) is C(true)
+    returned: O(images=true)
     type: int
     sample: 0
 
@@ -151,7 +176,7 @@ images_space_reclaimed:
 networks:
     description:
       - List of IDs of deleted networks.
-    returned: I(networks) is C(true)
+    returned: O(networks=true)
     type: list
     elements: str
     sample: []
@@ -160,14 +185,14 @@ networks:
 volumes:
     description:
       - List of IDs of deleted volumes.
-    returned: I(volumes) is C(true)
+    returned: O(volumes=true)
     type: list
     elements: str
     sample: []
 volumes_space_reclaimed:
     description:
       - Amount of reclaimed disk space from volumes pruning in bytes.
-    returned: I(volumes) is C(true)
+    returned: O(volumes=true)
     type: int
     sample: 0
 
@@ -175,14 +200,23 @@ volumes_space_reclaimed:
 builder_cache_space_reclaimed:
     description:
       - Amount of reclaimed disk space from builder cache pruning in bytes.
-    returned: I(builder_cache) is C(true)
+    returned: O(builder_cache=true)
     type: int
     sample: 0
+builder_cache_caches_deleted:
+    description:
+      - The build caches that were deleted.
+    returned: O(builder_cache=true) and API version is 1.39 or later
+    type: list
+    elements: str
+    sample: []
+    version_added: 3.10.0
 '''
 
 import traceback
 
 from ansible.module_utils.common.text.converters import to_native
+from ansible.module_utils.common.text.formatters import human_to_bytes
 
 from ansible_collections.community.docker.plugins.module_utils.common_api import (
     AnsibleDockerClient,
@@ -206,15 +240,32 @@ def main():
         volumes=dict(type='bool', default=False),
         volumes_filters=dict(type='dict'),
         builder_cache=dict(type='bool', default=False),
+        builder_cache_all=dict(type='bool', default=False),
+        builder_cache_filters=dict(type='dict'),
+        builder_cache_keep_storage=dict(type='str'),  # convert to bytes
     )
 
     client = AnsibleDockerClient(
         argument_spec=argument_spec,
+        option_minimal_versions=dict(
+            builder_cache=dict(docker_py_version='1.31'),
+            builder_cache_all=dict(docker_py_version='1.39'),
+            builder_cache_filters=dict(docker_py_version='1.31'),
+            builder_cache_keep_storage=dict(docker_py_version='1.39'),
+        ),
         # supports_check_mode=True,
     )
 
+    builder_cache_keep_storage = None
+    if client.module.params.get('builder_cache_keep_storage') is not None:
+        try:
+            builder_cache_keep_storage = human_to_bytes(client.module.params.get('builder_cache_keep_storage'))
+        except ValueError as exc:
+            client.module.fail_json(msg='Error while parsing value of builder_cache_keep_storage: {0}'.format(exc))
+
     try:
         result = dict()
+        changed = False
 
         if client.module.params['containers']:
             filters = clean_dict_booleans_for_docker_api(client.module.params.get('containers_filters'))
@@ -222,6 +273,8 @@ def main():
             res = client.post_to_json('/containers/prune', params=params)
             result['containers'] = res.get('ContainersDeleted') or []
             result['containers_space_reclaimed'] = res['SpaceReclaimed']
+            if result['containers'] or result['containers_space_reclaimed']:
+                changed = True
 
         if client.module.params['images']:
             filters = clean_dict_booleans_for_docker_api(client.module.params.get('images_filters'))
@@ -229,12 +282,16 @@ def main():
             res = client.post_to_json('/images/prune', params=params)
             result['images'] = res.get('ImagesDeleted') or []
             result['images_space_reclaimed'] = res['SpaceReclaimed']
+            if result['images'] or result['images_space_reclaimed']:
+                changed = True
 
         if client.module.params['networks']:
             filters = clean_dict_booleans_for_docker_api(client.module.params.get('networks_filters'))
             params = {'filters': convert_filters(filters)}
             res = client.post_to_json('/networks/prune', params=params)
             result['networks'] = res.get('NetworksDeleted') or []
+            if result['networks']:
+                changed = True
 
         if client.module.params['volumes']:
             filters = clean_dict_booleans_for_docker_api(client.module.params.get('volumes_filters'))
@@ -242,11 +299,27 @@ def main():
             res = client.post_to_json('/volumes/prune', params=params)
             result['volumes'] = res.get('VolumesDeleted') or []
             result['volumes_space_reclaimed'] = res['SpaceReclaimed']
+            if result['volumes'] or result['volumes_space_reclaimed']:
+                changed = True
 
         if client.module.params['builder_cache']:
-            res = client.post_to_json('/build/prune')
+            filters = clean_dict_booleans_for_docker_api(client.module.params.get('builder_cache_filters'))
+            params = {'filters': convert_filters(filters)}
+            if client.module.params.get('builder_cache_all'):
+                params['all'] = 'true'
+            if builder_cache_keep_storage is not None:
+                params['keep-storage'] = builder_cache_keep_storage
+            res = client.post_to_json('/build/prune', params=params)
             result['builder_cache_space_reclaimed'] = res['SpaceReclaimed']
+            if result['builder_cache_space_reclaimed']:
+                changed = True
+            if 'CachesDeleted' in res:
+                # API version 1.39+: return value CachesDeleted (list of str)
+                result['builder_cache_caches_deleted'] = res['CachesDeleted']
+                if result['builder_cache_caches_deleted']:
+                    changed = True
 
+        result['changed'] = changed
         client.module.exit_json(**result)
     except DockerException as e:
         client.fail('An unexpected Docker error occurred: {0}'.format(to_native(e)), exception=traceback.format_exc())

@@ -2,7 +2,7 @@
  "collection_info": {
   "namespace": "community",
   "name": "docker",
-  "version": "3.4.0",
+  "version": "3.10.3",
   "authors": [
    "Ansible Docker Working Group"
   ],
@@ -16,9 +16,11 @@
    "Apache-2.0"
   ],
   "license_file": null,
-  "dependencies": {},
+  "dependencies": {
+   "community.library_inventory_filtering_v1": ">=1.0.0"
+  },
   "repository": "https://github.com/ansible-collections/community.docker",
-  "documentation": null,
+  "documentation": "https://docs.ansible.com/ansible/latest/collections/community/docker/",
   "homepage": "https://github.com/ansible-collections/community.docker",
   "issues": "https://github.com/ansible-collections/community.docker/issues"
  },
@@ -26,7 +28,7 @@
   "name": "FILES.json",
   "ftype": "file",
   "chksum_type": "sha256",
-  "chksum_sha256": "1488759bb4c16b02fd47556c5820a7728a808982d314bde672defcdbfea2a3f8",
+  "chksum_sha256": "c5b11456e6a1ea1ee5144451aa5a1c46f7f835b3102db5ad06d16a005b4af551",
   "format": 1
  },
  "format": 1

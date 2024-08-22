@@ -9,17 +9,23 @@ set -euo pipefail
 
 cleanup() {
     echo "Cleanup"
-    ansible-playbook playbooks/docker_cleanup.yml
+    ansible-playbook playbooks/docker_cleanup.yml "$@"
     echo "Done"
 }
 
 trap cleanup INT TERM EXIT
 
 echo "Setup"
-ANSIBLE_ROLES_PATH=.. ansible-playbook  playbooks/docker_setup.yml
+ANSIBLE_ROLES_PATH=.. ansible-playbook  playbooks/docker_setup.yml "$@"
 
 echo "Test docker_containers inventory 1"
-ansible-playbook -i inventory_1.docker.yml playbooks/test_inventory_1.yml
+ansible-playbook -i inventory_1.docker.yml playbooks/test_inventory_1.yml "$@"
 
 echo "Test docker_containers inventory 2"
-ansible-playbook -i inventory_2.docker.yml playbooks/test_inventory_2.yml
+rm -f /tmp/ansible-docker-test-docker-inventory-container-*-labels.txt
+ansible-playbook -i inventory_2.docker.yml playbooks/test_inventory_2.yml "$@"
+
+echo "Validate that 'EVALUATED' does not appear in the labels"
+for FILENAME in /tmp/ansible-docker-test-docker-inventory-container-*-labels.txt; do
+  grep -qv EVALUATED "${FILENAME}" || ( echo "${FILENAME} contains EVALUATED!" && exit 1 )
+done

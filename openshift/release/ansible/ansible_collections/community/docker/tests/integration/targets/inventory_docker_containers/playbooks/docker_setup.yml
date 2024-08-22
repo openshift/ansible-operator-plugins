@@ -6,12 +6,16 @@
 - hosts: 127.0.0.1
   connection: local
   vars:
-    docker_skip_cleanup: yes
+    docker_skip_cleanup: true
 
   tasks:
     - name: Setup docker
       import_role:
         name: setup_docker
+
+    - name: Setup Docker Python deps
+      import_role:
+        name: setup_docker_python_deps
 
     - name: Start containers
       docker_container:
@@ -21,6 +25,8 @@
         command: '/bin/sh -c "sleep 10m"'
         published_ports:
           - 22/tcp
+        labels:
+          foo: !unsafe 'EVALU{{ "" }}ATED'
       loop:
         - name: ansible-docker-test-docker-inventory-container-1
         - name: ansible-docker-test-docker-inventory-container-2

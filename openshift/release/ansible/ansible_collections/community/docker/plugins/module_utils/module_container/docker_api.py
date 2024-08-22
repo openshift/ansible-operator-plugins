@@ -17,6 +17,11 @@ from ansible_collections.community.docker.plugins.module_utils.common_api import
     RequestException,
 )
 
+from ansible_collections.community.docker.plugins.module_utils._platform import (
+    compose_platform_string,
+    normalize_platform_string,
+)
+
 from ansible_collections.community.docker.plugins.module_utils.module_container.base import (
     OPTION_AUTO_REMOVE,
     OPTION_BLKIO_WEIGHT,
@@ -108,7 +113,6 @@ from ansible_collections.community.docker.plugins.module_utils._api.errors impor
 from ansible_collections.community.docker.plugins.module_utils._api.utils.utils import (
     convert_port_bindings,
     normalize_links,
-    parse_repository_tag,
 )
 
 
@@ -166,6 +170,8 @@ class DockerAPIEngineDriver(EngineDriver):
                 for option in options.options:
                     if not option.not_an_ansible_option:
                         option_minimal_versions[option.name] = {'docker_api_version': engine.min_api_version}
+            if engine.extra_option_minimal_versions:
+                option_minimal_versions.update(engine.extra_option_minimal_versions)
 
             active_options.append(options)
 
@@ -181,6 +187,9 @@ class DockerAPIEngineDriver(EngineDriver):
         )
 
         return client.module, active_options, client
+
+    def get_host_info(self, client):
+        return client.info()
 
     def get_api_version(self, client):
         return client.docker_api_version
@@ -217,7 +226,7 @@ class DockerAPIEngineDriver(EngineDriver):
         return client.get_container_by_id(container_id)
 
     def inspect_image_by_id(self, client, image_id):
-        return client.find_image_by_id(image_id)
+        return client.find_image_by_id(image_id, accept_missing_image=True)
 
     def inspect_image_by_name(self, client, repository, tag):
         return client.find_image(repository, tag)
@@ -237,7 +246,13 @@ class DockerAPIEngineDriver(EngineDriver):
     def connect_container_to_network(self, client, container_id, network_id, parameters=None):
         parameters = (parameters or {}).copy()
         params = {}
-        for para, dest_para in {'ipv4_address': 'IPv4Address', 'ipv6_address': 'IPv6Address', 'links': 'Links', 'aliases': 'Aliases'}.items():
+        for para, dest_para in {
+            'ipv4_address': 'IPv4Address',
+            'ipv6_address': 'IPv6Address',
+            'links': 'Links',
+            'aliases': 'Aliases',
+            'mac_address': 'MacAddress',
+        }.items():
             value = parameters.pop(para, None)
             if value:
                 if para == 'links':
@@ -388,18 +403,27 @@ class DockerAPIEngine(Engine):
         can_set_value=None,
         can_update_value=None,
         min_api_version=None,
+        compare_value=None,
+        needs_container_image=None,
+        needs_host_info=None,
+        extra_option_minimal_versions=None,
     ):
         self.min_api_version = min_api_version
         self.min_api_version_obj = None if min_api_version is None else LooseVersion(min_api_version)
         self.get_value = get_value
         self.set_value = set_value
-        self.get_expected_values = get_expected_values or (lambda module, client, api_version, options, image, values: values)
+        self.get_expected_values = get_expected_values or (lambda module, client, api_version, options, image, values, host_info: values)
         self.ignore_mismatching_result = ignore_mismatching_result or \
             (lambda module, client, api_version, option, image, container_value, expected_value: False)
         self.preprocess_value = preprocess_value or (lambda module, client, api_version, options, values: values)
         self.update_value = update_value
         self.can_set_value = can_set_value or (lambda api_version: set_value is not None)
         self.can_update_value = can_update_value or (lambda api_version: update_value is not None)
+        self.needs_container_image = needs_container_image or (lambda values: False)
+        self.needs_host_info = needs_host_info or (lambda values: False)
+        if compare_value is not None:
+            self.compare_value = compare_value
+        self.extra_option_minimal_versions = extra_option_minimal_versions
 
     @classmethod
     def config_value(
@@ -412,6 +436,7 @@ class DockerAPIEngine(Engine):
         min_api_version=None,
         preprocess_value=None,
         update_parameter=None,
+        extra_option_minimal_versions=None,
     ):
         def preprocess_value_(module, client, api_version, options, values):
             if len(options) != 1:
@@ -424,7 +449,7 @@ class DockerAPIEngine(Engine):
                     values[options[0].name] = value
             return values
 
-        def get_value(module, container, api_version, options):
+        def get_value(module, container, api_version, options, image, host_info):
             if len(options) != 1:
                 raise AssertionError('config_value can only be used for a single option')
             value = container['Config'].get(config_name, _SENTRY)
@@ -436,7 +461,7 @@ class DockerAPIEngine(Engine):
 
         get_expected_values_ = None
         if get_expected_value:
-            def get_expected_values_(module, client, api_version, options, image, values):
+            def get_expected_values_(module, client, api_version, options, image, values, host_info):
                 if len(options) != 1:
                     raise AssertionError('host_config_value can only be used for a single option')
                 value = values.get(options[0].name, _SENTRY)
@@ -475,6 +500,7 @@ class DockerAPIEngine(Engine):
             set_value=set_value,
             min_api_version=min_api_version,
             update_value=update_value,
+            extra_option_minimal_versions=extra_option_minimal_versions,
         )
 
     @classmethod
@@ -488,6 +514,7 @@ class DockerAPIEngine(Engine):
         min_api_version=None,
         preprocess_value=None,
         update_parameter=None,
+        extra_option_minimal_versions=None,
     ):
         def preprocess_value_(module, client, api_version, options, values):
             if len(options) != 1:
@@ -500,7 +527,7 @@ class DockerAPIEngine(Engine):
                     values[options[0].name] = value
             return values
 
-        def get_value(module, container, api_version, options):
+        def get_value(module, container, api_version, options, get_value, host_info):
             if len(options) != 1:
                 raise AssertionError('host_config_value can only be used for a single option')
             value = container['HostConfig'].get(host_config_name, _SENTRY)
@@ -512,7 +539,7 @@ class DockerAPIEngine(Engine):
 
         get_expected_values_ = None
         if get_expected_value:
-            def get_expected_values_(module, client, api_version, options, image, values):
+            def get_expected_values_(module, client, api_version, options, image, values, host_info):
                 if len(options) != 1:
                     raise AssertionError('host_config_value can only be used for a single option')
                 value = values.get(options[0].name, _SENTRY)
@@ -553,6 +580,7 @@ class DockerAPIEngine(Engine):
             set_value=set_value,
             min_api_version=min_api_version,
             update_value=update_value,
+            extra_option_minimal_versions=extra_option_minimal_versions,
         )
 
 
@@ -586,7 +614,7 @@ def _get_default_host_ip(module, client):
     return ip
 
 
-def _get_value_detach_interactive(module, container, api_version, options):
+def _get_value_detach_interactive(module, container, api_version, options, image, host_info):
     attach_stdin = container['Config'].get('OpenStdin')
     attach_stderr = container['Config'].get('AttachStderr')
     attach_stdout = container['Config'].get('AttachStdout')
@@ -718,7 +746,7 @@ def _preprocess_etc_hosts(module, client, api_version, value):
 def _preprocess_healthcheck(module, client, api_version, value):
     if value is None:
         return value
-    if not value or not value.get('test'):
+    if not value or not (value.get('test') or (value.get('test_cli_compatible') and value.get('test') is None)):
         value = {'test': ['NONE']}
     elif 'test' in value:
         value['test'] = normalize_healthcheck_test(value['test'])
@@ -727,6 +755,7 @@ def _preprocess_healthcheck(module, client, api_version, value):
         'Interval': value.get('interval'),
         'Timeout': value.get('timeout'),
         'StartPeriod': value.get('start_period'),
+        'StartInterval': value.get('start_interval'),
         'Retries': value.get('retries'),
     })
 
@@ -837,7 +866,7 @@ def _get_network_id(module, client, network_name):
         client.fail("Error getting network id for %s - %s" % (network_name, to_native(exc)))
 
 
-def _get_values_network(module, container, api_version, options):
+def _get_values_network(module, container, api_version, options, image, host_info):
     value = container['HostConfig'].get('NetworkMode', _SENTRY)
     if value is _SENTRY:
         return {}
@@ -853,7 +882,7 @@ def _set_values_network(module, data, api_version, options, values):
     data['HostConfig']['NetworkMode'] = value
 
 
-def _get_values_mounts(module, container, api_version, options):
+def _get_values_mounts(module, container, api_version, options, image, host_info):
     volumes = container['Config'].get('Volumes')
     binds = container['HostConfig'].get('Binds')
     # According to https://github.com/moby/moby/, support for HostConfig.Mounts
@@ -917,7 +946,7 @@ def _get_image_binds(volumes):
     return results
 
 
-def _get_expected_values_mounts(module, client, api_version, options, image, values):
+def _get_expected_values_mounts(module, client, api_version, options, image, values, host_info):
     expected_values = {}
 
     # binds
@@ -995,8 +1024,8 @@ def _set_values_mounts(module, data, api_version, options, values):
                     tmpfs_opts['Mode'] = mount.get('tmpfs_mode')
                 if mount.get('tmpfs_size'):
                     tmpfs_opts['SizeBytes'] = mount.get('tmpfs_size')
-                if mount.get('tmpfs_opts'):
-                    mount_res['TmpfsOptions'] = mount.get('tmpfs_opts')
+                if tmpfs_opts:
+                    mount_res['TmpfsOptions'] = tmpfs_opts
             mounts.append(mount_res)
         data['HostConfig']['Mounts'] = mounts
     if 'volumes' in values:
@@ -1018,7 +1047,7 @@ def _set_values_mounts(module, data, api_version, options, values):
         data['HostConfig']['Binds'] = values['volume_binds']
 
 
-def _get_values_log(module, container, api_version, options):
+def _get_values_log(module, container, api_version, options, image, host_info):
     log_config = container['HostConfig'].get('LogConfig') or {}
     return {
         'log_driver': log_config.get('Type'),
@@ -1038,10 +1067,34 @@ def _set_values_log(module, data, api_version, options, values):
     data['HostConfig']['LogConfig'] = log_config
 
 
-def _get_values_platform(module, container, api_version, options):
+def _get_values_platform(module, container, api_version, options, image, host_info):
+    if image and (image.get('Os') or image.get('Architecture') or image.get('Variant')):
+        return {
+            'platform': compose_platform_string(
+                os=image.get('Os'),
+                arch=image.get('Architecture'),
+                variant=image.get('Variant'),
+                daemon_os=host_info.get('OSType') if host_info else None,
+                daemon_arch=host_info.get('Architecture') if host_info else None,
+            )
+        }
     return {
         'platform': container.get('Platform'),
     }
+
+
+def _get_expected_values_platform(module, client, api_version, options, image, values, host_info):
+    expected_values = {}
+    if 'platform' in values:
+        try:
+            expected_values['platform'] = normalize_platform_string(
+                values['platform'],
+                daemon_os=host_info.get('OSType') if host_info else None,
+                daemon_arch=host_info.get('Architecture') if host_info else None,
+            )
+        except ValueError as exc:
+            module.fail_json(msg='Error while parsing platform parameer: %s' % (to_native(exc), ))
+    return expected_values
 
 
 def _set_values_platform(module, data, api_version, options, values):
@@ -1049,7 +1102,15 @@ def _set_values_platform(module, data, api_version, options, values):
         data['platform'] = values['platform']
 
 
-def _get_values_restart(module, container, api_version, options):
+def _needs_container_image_platform(values):
+    return 'platform' in values
+
+
+def _needs_host_info_platform(values):
+    return 'platform' in values
+
+
+def _get_values_restart(module, container, api_version, options, image, host_info):
     restart_policy = container['HostConfig'].get('RestartPolicy') or {}
     return {
         'restart_policy': restart_policy.get('Name'),
@@ -1078,7 +1139,7 @@ def _update_value_restart(module, data, api_version, options, values):
     }
 
 
-def _get_values_ports(module, container, api_version, options):
+def _get_values_ports(module, container, api_version, options, image, host_info):
     host_config = container['HostConfig']
     config = container['Config']
 
@@ -1095,7 +1156,7 @@ def _get_values_ports(module, container, api_version, options):
     }
 
 
-def _get_expected_values_ports(module, client, api_version, options, image, values):
+def _get_expected_values_ports(module, client, api_version, options, image, values, host_info):
     expected_values = {}
 
     if 'published_ports' in values:
@@ -1244,7 +1305,16 @@ OPTION_ETC_HOSTS.add_engine('docker_api', DockerAPIEngine.host_config_value('Ext
 OPTION_GROUPS.add_engine('docker_api', DockerAPIEngine.host_config_value('GroupAdd'))
 
 OPTION_HEALTHCHECK.add_engine('docker_api', DockerAPIEngine.config_value(
-    'Healthcheck', preprocess_value=_preprocess_healthcheck, postprocess_for_get=_postprocess_healthcheck_get_value))
+    'Healthcheck',
+    preprocess_value=_preprocess_healthcheck,
+    postprocess_for_get=_postprocess_healthcheck_get_value,
+    extra_option_minimal_versions={
+        'healthcheck.start_interval': {
+            'docker_api_version': '1.44',
+            'detect_usage': lambda c: c.module.params['healthcheck'] and c.module.params['healthcheck']['start_interval'] is not None,
+        },
+    },
+))
 
 OPTION_HOSTNAME.add_engine('docker_api', DockerAPIEngine.config_value('Hostname'))
 
@@ -1284,6 +1354,12 @@ OPTION_NETWORK.add_engine('docker_api', DockerAPIEngine(
     get_value=_get_values_network,
     set_value=_set_values_network,
     ignore_mismatching_result=_ignore_mismatching_network_result,
+    extra_option_minimal_versions={
+        'networks.mac_address': {
+            'docker_api_version': '1.44',
+            'detect_usage': lambda c: any(net_info.get('mac_address') is not None for net_info in (c.module.params['networks'] or [])),
+        },
+    },
 ))
 
 OPTION_OOM_KILLER.add_engine('docker_api', DockerAPIEngine.host_config_value('OomKillDisable'))
@@ -1297,6 +1373,9 @@ OPTION_PIDS_LIMIT.add_engine('docker_api', DockerAPIEngine.host_config_value('Pi
 OPTION_PLATFORM.add_engine('docker_api', DockerAPIEngine(
     get_value=_get_values_platform,
     set_value=_set_values_platform,
+    get_expected_values=_get_expected_values_platform,
+    needs_container_image=_needs_container_image_platform,
+    needs_host_info=_needs_host_info_platform,
     min_api_version='1.41',
 ))
 

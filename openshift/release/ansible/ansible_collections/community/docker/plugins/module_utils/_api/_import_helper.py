@@ -21,9 +21,9 @@ BACKPORTS_SSL_MATCH_HOSTNAME_IMPORT_ERROR = None
 
 
 try:
-    from requests import Session
-    from requests.adapters import HTTPAdapter
-    from requests.exceptions import HTTPError, InvalidSchema
+    from requests import Session  # noqa: F401, pylint: disable=unused-import
+    from requests.adapters import HTTPAdapter  # noqa: F401, pylint: disable=unused-import
+    from requests.exceptions import HTTPError, InvalidSchema  # noqa: F401, pylint: disable=unused-import
 except ImportError:
     REQUESTS_IMPORT_ERROR = traceback.format_exc()
 
@@ -42,13 +42,18 @@ except ImportError:
 
 try:
     from requests.packages import urllib3
+    from requests.packages.urllib3 import connection as urllib3_connection  # pylint: disable=unused-import
 except ImportError:
     try:
         import urllib3
+        from urllib3 import connection as urllib3_connection  # pylint: disable=unused-import
     except ImportError:
         URLLIB3_IMPORT_ERROR = traceback.format_exc()
 
         class _HTTPConnectionPool(object):
+            pass
+
+        class _HTTPConnection(object):
             pass
 
         class FakeURLLIB3(object):
@@ -63,7 +68,12 @@ except ImportError:
                 self.match_hostname = object()
                 self.HTTPConnectionPool = _HTTPConnectionPool
 
+        class FakeURLLIB3Connection(object):
+            def __init__(self):
+                self.HTTPConnection = _HTTPConnection
+
         urllib3 = FakeURLLIB3()
+        urllib3_connection = FakeURLLIB3Connection()
 
 
 # Monkey-patching match_hostname with a version that supports

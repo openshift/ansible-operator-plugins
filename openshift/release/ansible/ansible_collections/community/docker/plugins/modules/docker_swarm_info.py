@@ -77,10 +77,10 @@ options:
     default: false
   verbose_output:
     description:
-      - When set to C(true) and I(nodes), I(services) or I(tasks) is set to C(true), then the module output will
+      - When set to V(true) and O(nodes), O(services), or O(tasks) is set to V(true), then the module output will
         contain verbose information about objects matching the full output of API method.
       - For details see the documentation of your version of Docker API at U(https://docs.docker.com/engine/api/).
-      - The verbose output in this module contains only subset of information returned by I(_info) module
+      - The verbose output in this module contains only subset of information returned by this info module
         for each type of the objects.
     type: bool
     default: false
@@ -103,8 +103,6 @@ EXAMPLES = '''
       Docker in Swarm mode: {{ result.docker_swarm_active }}
       This is a Manager node: {{ result.docker_swarm_manager }}
 
-- block:
-
 - name: Get info on Docker Swarm and list of registered nodes
   community.docker.docker_swarm_info:
     nodes: true
@@ -123,7 +121,8 @@ EXAMPLES = '''
       name: mynode
   register: result
 
-- ansible.builtin.debug:
+- name: Show swarm facts
+  ansible.builtin.debug:
     var: result.swarm_facts
 
 - name: Get the swarm unlock key
@@ -131,7 +130,8 @@ EXAMPLES = '''
     unlock_key: true
   register: result
 
-- ansible.builtin.debug:
+- name: Print swarm unlock key
+  ansible.builtin.debug:
     var: result.swarm_unlock_key
 
 '''
@@ -139,21 +139,21 @@ EXAMPLES = '''
 RETURN = '''
 can_talk_to_docker:
     description:
-      - Will be C(true) if the module can talk to the docker daemon.
+      - Will be V(true) if the module can talk to the docker daemon.
     returned: both on success and on error
     type: bool
 docker_swarm_active:
     description:
-      - Will be C(true) if the module can talk to the docker daemon,
+      - Will be V(true) if the module can talk to the docker daemon,
         and the docker daemon is in Swarm mode.
     returned: both on success and on error
     type: bool
 docker_swarm_manager:
     description:
-      - Will be C(true) if the module can talk to the docker daemon,
+      - Will be V(true) if the module can talk to the docker daemon,
         the docker daemon is in Swarm mode, and the current node is
         a manager node.
-      - Only if this one is C(true), the module will not fail.
+      - Only if this one is V(true), the module will not fail.
     returned: both on success and on error
     type: bool
 swarm_facts:
@@ -165,30 +165,30 @@ swarm_facts:
 swarm_unlock_key:
     description:
       - Contains the key needed to unlock the swarm.
-    returned: When I(unlock_key) is C(true).
+    returned: When O(unlock_key=true).
     type: str
 nodes:
     description:
       - List of dict objects containing the basic information about each volume.
-        Keys matches the C(docker node ls) output unless I(verbose_output=true).
-        See description for I(verbose_output).
-    returned: When I(nodes) is C(true)
+        Keys matches the C(docker node ls) output unless O(verbose_output=true).
+        See description for O(verbose_output).
+    returned: When O(nodes=true)
     type: list
     elements: dict
 services:
     description:
       - List of dict objects containing the basic information about each volume.
-        Keys matches the C(docker service ls) output unless I(verbose_output=true).
-        See description for I(verbose_output).
-    returned: When I(services) is C(true)
+        Keys matches the C(docker service ls) output unless O(verbose_output=true).
+        See description for O(verbose_output).
+    returned: When O(services=true)
     type: list
     elements: dict
 tasks:
     description:
       - List of dict objects containing the basic information about each volume.
-        Keys matches the C(docker service ps) output unless I(verbose_output=true).
-        See description for I(verbose_output).
-    returned: When I(tasks) is C(true)
+        Keys matches the C(docker service ps) output unless O(verbose_output=true).
+        See description for O(verbose_output).
+    returned: When O(tasks=true)
     type: list
     elements: dict
 
@@ -326,7 +326,7 @@ class DockerSwarmManager(DockerBaseClass):
             # Number of replicas have to be updated in calling method or may be left as None
             object_essentials['Replicas'] = None
         object_essentials['Image'] = item['Spec']['TaskTemplate']['ContainerSpec']['Image']
-        if 'Ports' in item['Spec']['EndpointSpec']:
+        if item['Spec'].get('EndpointSpec') and 'Ports' in item['Spec']['EndpointSpec']:
             object_essentials['Ports'] = item['Spec']['EndpointSpec']['Ports']
         else:
             object_essentials['Ports'] = []

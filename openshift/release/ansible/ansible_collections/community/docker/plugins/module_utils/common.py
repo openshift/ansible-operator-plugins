@@ -12,13 +12,10 @@ import platform
 import re
 import sys
 import traceback
-from datetime import timedelta
 
-from ansible.module_utils.basic import AnsibleModule, env_fallback, missing_required_lib
-from ansible.module_utils.common.collections import is_sequence
+from ansible.module_utils.basic import AnsibleModule, missing_required_lib
 from ansible.module_utils.common._collections_compat import Mapping, Sequence
 from ansible.module_utils.six import string_types
-from ansible.module_utils.six.moves.urllib.parse import urlparse
 from ansible.module_utils.parsing.convert_bool import BOOLEANS_TRUE, BOOLEANS_FALSE
 
 from ansible_collections.community.docker.plugins.module_utils.version import LooseVersion
@@ -56,21 +53,21 @@ except ImportError as exc:
 # installed, as they utilize the same namespace are are incompatible
 try:
     # docker (Docker SDK for Python >= 2.0.0)
-    import docker.models  # noqa: F401
+    import docker.models  # noqa: F401, pylint: disable=unused-import
     HAS_DOCKER_MODELS = True
 except ImportError:
     HAS_DOCKER_MODELS = False
 
 try:
     # docker-py (Docker SDK for Python < 2.0.0)
-    import docker.ssladapter  # noqa: F401
+    import docker.ssladapter  # noqa: F401, pylint: disable=unused-import
     HAS_DOCKER_SSLADAPTER = True
 except ImportError:
     HAS_DOCKER_SSLADAPTER = False
 
 
 try:
-    from requests.exceptions import RequestException
+    from requests.exceptions import RequestException  # noqa: F401, pylint: disable=unused-import
 except ImportError:
     # Either Docker SDK for Python is no longer using requests, or Docker SDK for Python isn't around either,
     # or Docker SDK for Python's dependency requests is missing. In any case, define an exception
@@ -78,30 +75,30 @@ except ImportError:
     class RequestException(Exception):
         pass
 
-from ansible_collections.community.docker.plugins.module_utils.util import (
+from ansible_collections.community.docker.plugins.module_utils.util import (  # noqa: F401, pylint: disable=unused-import
     DEFAULT_DOCKER_HOST,
     DEFAULT_TLS,
     DEFAULT_TLS_VERIFY,
-    DEFAULT_TLS_HOSTNAME,
+    DEFAULT_TLS_HOSTNAME,  # TODO: remove
     DEFAULT_TIMEOUT_SECONDS,
     DOCKER_COMMON_ARGS,
-    DOCKER_COMMON_ARGS_VARS,
+    DOCKER_COMMON_ARGS_VARS,  # TODO: remove
     DOCKER_MUTUALLY_EXCLUSIVE,
     DOCKER_REQUIRED_TOGETHER,
-    DEFAULT_DOCKER_REGISTRY,
-    BYTE_SUFFIXES,
-    is_image_name_id,
-    is_valid_tag,
+    DEFAULT_DOCKER_REGISTRY,  # TODO: remove
+    BYTE_SUFFIXES,  # TODO: remove
+    is_image_name_id,  # TODO: remove
+    is_valid_tag,  # TODO: remove
     sanitize_result,
-    DockerBaseClass,
+    DockerBaseClass,  # TODO: remove
     update_tls_hostname,
-    compare_dict_allow_more_present,
-    compare_generic,
-    DifferenceTracker,
-    clean_dict_booleans_for_docker_api,
-    convert_duration_to_nanosecond,
-    parse_healthcheck,
-    omit_none_from_dict,
+    compare_dict_allow_more_present,  # TODO: remove
+    compare_generic,  # TODO: remove
+    DifferenceTracker,  # TODO: remove
+    clean_dict_booleans_for_docker_api,  # TODO: remove
+    convert_duration_to_nanosecond,  # TODO: remove
+    parse_healthcheck,  # TODO: remove
+    omit_none_from_dict,  # TODO: remove
 )
 
 
@@ -125,6 +122,32 @@ if not HAS_DOCKER_PY:
 
 
 def _get_tls_config(fail_function, **kwargs):
+    if 'ssl_version' in kwargs and LooseVersion(docker_version) >= LooseVersion('7.0.0b1'):
+        ssl_version = kwargs.pop('ssl_version')
+        if ssl_version is not None:
+            fail_function(
+                "ssl_version is not compatible with Docker SDK for Python 7.0.0+. You are using"
+                " Docker SDK for Python {docker_py_version}. The ssl_version option (value: {ssl_version})"
+                " has either been set directly or with the environment variable DOCKER_SSL_VERSION."
+                " Make sure it is not set, or switch to an older version of Docker SDK for Python.".format(
+                    docker_py_version=docker_version,
+                    ssl_version=ssl_version,
+                )
+            )
+    if 'assert_hostname' in kwargs and LooseVersion(docker_version) >= LooseVersion('7.0.0b1'):
+        assert_hostname = kwargs.pop('assert_hostname')
+        if assert_hostname is not None:
+            fail_function(
+                "tls_hostname is not compatible with Docker SDK for Python 7.0.0+. You are using"
+                " Docker SDK for Python {docker_py_version}. The tls_hostname option (value: {tls_hostname})"
+                " has either been set directly or with the environment variable DOCKER_TLS_HOSTNAME."
+                " Make sure it is not set, or switch to an older version of Docker SDK for Python.".format(
+                    docker_py_version=docker_version,
+                    tls_hostname=assert_hostname,
+                )
+            )
+    # Filter out all None parameters
+    kwargs = dict((k, v) for k, v in kwargs.items() if v is not None)
     try:
         tls_config = TLSConfig(**kwargs)
         return tls_config
@@ -237,12 +260,8 @@ class AnsibleDockerClientBase(Client):
     def log(self, msg, pretty_print=False):
         pass
         # if self.debug:
-        #     log_file = open('docker.log', 'a')
-        #     if pretty_print:
-        #         log_file.write(json.dumps(msg, sort_keys=True, indent=4, separators=(',', ': ')))
-        #         log_file.write(u'\n')
-        #     else:
-        #         log_file.write(msg + u'\n')
+        #     from .util import log_debug
+        #     log_debug(msg, pretty_print=pretty_print)
 
     @abc.abstractmethod
     def fail(self, msg, **kwargs):
@@ -312,7 +331,7 @@ class AnsibleDockerClientBase(Client):
                                          'DOCKER_TLS_HOSTNAME', None, type='str'),
             api_version=self._get_value('api_version', params['api_version'], 'DOCKER_API_VERSION',
                                         'auto', type='str'),
-            cacert_path=self._get_value('cacert_path', params['ca_cert'], 'DOCKER_CERT_PATH', None, type='str'),
+            cacert_path=self._get_value('cacert_path', params['ca_path'], 'DOCKER_CERT_PATH', None, type='str'),
             cert_path=self._get_value('cert_path', params['client_cert'], 'DOCKER_CERT_PATH', None, type='str'),
             key_path=self._get_value('key_path', params['client_key'], 'DOCKER_CERT_PATH', None, type='str'),
             ssl_version=self._get_value('ssl_version', params['ssl_version'], 'DOCKER_SSL_VERSION', None, type='str'),
@@ -459,7 +478,7 @@ class AnsibleDockerClientBase(Client):
                     images = self._image_lookup(lookup, tag)
 
         if len(images) > 1:
-            self.fail("Registry returned more than one result for %s:%s" % (name, tag))
+            self.fail("Daemon returned more than one result for %s:%s" % (name, tag))
 
         if len(images) == 1:
             try:
