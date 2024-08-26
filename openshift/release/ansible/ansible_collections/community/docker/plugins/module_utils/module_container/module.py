@@ -78,6 +78,11 @@ class ContainerManager(DockerBaseClass):
         self.param_output_logs = self.module.params['output_logs']
         self.param_paused = self.module.params['paused']
         self.param_pull = self.module.params['pull']
+        if self.param_pull is True:
+            self.param_pull = 'always'
+        if self.param_pull is False:
+            self.param_pull = 'missing'
+        self.param_pull_check_mode_behavior = self.module.params['pull_check_mode_behavior']
         self.param_recreate = self.module.params['recreate']
         self.param_removal_wait_timeout = self.module.params['removal_wait_timeout']
         self.param_restart = self.module.params['restart']
@@ -132,7 +137,7 @@ class ContainerManager(DockerBaseClass):
             self.all_options['image'].comparison = 'ignore'
         if self.module.params['purge_networks']:
             self.all_options['networks'].comparison = 'strict'
-        # Process comparsions specified by user
+        # Process comparisons specified by user
         if self.module.params.get('comparisons'):
             # If '*' appears in comparisons, process it first
             if '*' in self.module.params['comparisons']:
@@ -268,6 +273,20 @@ class ContainerManager(DockerBaseClass):
             parameters.append((options, values))
         return parameters
 
+    def _needs_container_image(self):
+        for options, values in self.parameters:
+            engine = options.get_engine(self.engine_driver.name)
+            if engine.needs_container_image(values):
+                return True
+        return False
+
+    def _needs_host_info(self):
+        for options, values in self.parameters:
+            engine = options.get_engine(self.engine_driver.name)
+            if engine.needs_host_info(values):
+                return True
+        return False
+
     def present(self, state):
         self.parameters = self._collect_params(self.options)
         container = self._get_container(self.param_name)
@@ -280,8 +299,10 @@ class ContainerManager(DockerBaseClass):
         # the container already runs or not; in the former case, in case the
         # container needs to be restarted, we use the existing container's
         # image ID.
-        image, comparison_image = self._get_image(container)
+        image, container_image, comparison_image = self._get_image(
+            container, needs_container_image=self._needs_container_image())
         self.log(image, pretty_print=True)
+        host_info = self.engine_driver.get_host_info(self.client) if self._needs_host_info() else None
         if not container.exists or container.removing:
             # New container
             if container.removing:
@@ -301,13 +322,24 @@ class ContainerManager(DockerBaseClass):
             container_created = True
         else:
             # Existing container
-            different, differences = self.has_different_configuration(container, comparison_image)
+            different, differences = self.has_different_configuration(container, container_image, comparison_image, host_info)
             image_different = False
             if self.all_options['image'].comparison == 'strict':
                 image_different = self._image_is_different(image, container)
-                if self.param_image_name_mismatch == 'recreate' and self.param_image is not None and self.param_image != container.image_name:
-                    different = True
-                    self.diff_tracker.add('image_name', parameter=self.param_image, active=container.image_name)
+                if self.param_image_name_mismatch != 'ignore' and self.param_image is not None and self.param_image != container.image_name:
+                    if self.param_image_name_mismatch == 'recreate':
+                        different = True
+                        self.diff_tracker.add('image_name', parameter=self.param_image, active=container.image_name)
+                    else:
+                        # The default has been deprecated!
+                        self.module.deprecate(
+                            'The default value "ignore" for image_name_mismatch has been deprecated and will change to "recreate"'
+                            ' in community.docker 4.0.0. In the current situation, this would cause the container to be recreated'
+                            ' since the current container\'s image name "{active}" does not match the desired image name "{parameter}".'.format(
+                                parameter=self.param_image, active=container.image_name),
+                            version='4.0.0',
+                            collection_name='community.docker',
+                        )
             if image_different or different or self.param_recreate:
                 self.diff_tracker.merge(differences)
                 self.diff['differences'] = differences.get_legacy_docker_container_diffs()
@@ -333,7 +365,7 @@ class ContainerManager(DockerBaseClass):
                 comparison_image = image
 
         if container and container.exists:
-            container = self.update_limits(container, comparison_image)
+            container = self.update_limits(container, container_image, comparison_image, host_info)
             container = self.update_networks(container, container_created)
 
             if state == 'started' and not container.running:
@@ -398,45 +430,58 @@ class ContainerManager(DockerBaseClass):
             image = self.engine_driver.inspect_image_by_name(self.client, repository, tag)
         return image or fallback
 
-    def _get_image(self, container):
+    def _get_image(self, container, needs_container_image=False):
         image_parameter = self.param_image
+        get_container_image = needs_container_image or not image_parameter
+        container_image = self._get_container_image(container) if get_container_image else None
+        if container_image:
+            self.log("current image")
+            self.log(container_image, pretty_print=True)
         if not image_parameter:
             self.log('No image specified')
-            return None, self._get_container_image(container)
+            return None, container_image, container_image
         if is_image_name_id(image_parameter):
             image = self.engine_driver.inspect_image_by_id(self.client, image_parameter)
+            if image is None:
+                self.client.fail("Cannot find image with ID %s" % (image_parameter, ))
         else:
             repository, tag = parse_repository_tag(image_parameter)
             if not tag:
                 tag = "latest"
             image = self.engine_driver.inspect_image_by_name(self.client, repository, tag)
-            if not image or self.param_pull:
+            if not image and self.param_pull == "never":
+                self.client.fail("Cannot find image with name %s:%s, and pull=never" % (repository, tag))
+            if not image or self.param_pull == "always":
                 if not self.check_mode:
                     self.log("Pull the image.")
                     image, alreadyToLatest = self.engine_driver.pull_image(
                         self.client, repository, tag, platform=self.module.params['platform'])
                     if alreadyToLatest:
                         self.results['changed'] = False
+                        self.results['actions'].append(dict(pulled_image="%s:%s" % (repository, tag), changed=False))
                     else:
                         self.results['changed'] = True
-                        self.results['actions'].append(dict(pulled_image="%s:%s" % (repository, tag)))
-                elif not image:
-                    # If the image isn't there, claim we'll pull.
-                    # (Implicitly: if the image is there, claim it already was latest.)
+                        self.results['actions'].append(dict(pulled_image="%s:%s" % (repository, tag), changed=True))
+                elif not image or self.param_pull_check_mode_behavior == 'always':
+                    # If the image isn't there, or pull_check_mode_behavior == 'always', claim we'll
+                    # pull. (Implicitly: if the image is there, claim it already was latest unless
+                    # pull_check_mode_behavior == 'always'.)
                     self.results['changed'] = True
-                    self.results['actions'].append(dict(pulled_image="%s:%s" % (repository, tag)))
+                    action = dict(pulled_image="%s:%s" % (repository, tag))
+                    if not image:
+                        action['changed'] = True
+                    self.results['actions'].append(action)
 
         self.log("image")
         self.log(image, pretty_print=True)
 
         comparison_image = image
         if self.param_image_comparison == 'current-image':
-            comparison_image = self._get_container_image(container, image)
-            if comparison_image != image:
-                self.log("current image")
-                self.log(comparison_image, pretty_print=True)
+            if not get_container_image:
+                container_image = self._get_container_image(container)
+            comparison_image = container_image
 
-        return image, comparison_image
+        return image, container_image, comparison_image
 
     def _image_is_different(self, image, container):
         if image and image.get('Id'):
@@ -455,15 +500,16 @@ class ContainerManager(DockerBaseClass):
         params['Image'] = image
         return params
 
-    def _record_differences(self, differences, options, param_values, engine, container, image):
-        container_values = engine.get_value(self.module, container.raw, self.engine_driver.get_api_version(self.client), options.options)
+    def _record_differences(self, differences, options, param_values, engine, container, container_image, image, host_info):
+        container_values = engine.get_value(
+            self.module, container.raw, self.engine_driver.get_api_version(self.client), options.options, container_image, host_info)
         expected_values = engine.get_expected_values(
-            self.module, self.client, self.engine_driver.get_api_version(self.client), options.options, image, param_values.copy())
+            self.module, self.client, self.engine_driver.get_api_version(self.client), options.options, image, param_values.copy(), host_info)
         for option in options.options:
             if option.name in expected_values:
                 param_value = expected_values[option.name]
                 container_value = container_values.get(option.name)
-                match = compare_generic(param_value, container_value, option.comparison, option.comparison_type)
+                match = engine.compare_value(option, param_value, container_value)
 
                 if not match:
                     # No match.
@@ -497,28 +543,28 @@ class ContainerManager(DockerBaseClass):
                             c = sorted(c, key=sort_key_fn)
                     differences.add(option.name, parameter=p, active=c)
 
-    def has_different_configuration(self, container, image):
+    def has_different_configuration(self, container, container_image, image, host_info):
         differences = DifferenceTracker()
         update_differences = DifferenceTracker()
         for options, param_values in self.parameters:
             engine = options.get_engine(self.engine_driver.name)
             if engine.can_update_value(self.engine_driver.get_api_version(self.client)):
-                self._record_differences(update_differences, options, param_values, engine, container, image)
+                self._record_differences(update_differences, options, param_values, engine, container, container_image, image, host_info)
             else:
-                self._record_differences(differences, options, param_values, engine, container, image)
+                self._record_differences(differences, options, param_values, engine, container, container_image, image, host_info)
         has_differences = not differences.empty
         # Only consider differences of properties that can be updated when there are also other differences
         if has_differences:
             differences.merge(update_differences)
         return has_differences, differences
 
-    def has_different_resource_limits(self, container, image):
+    def has_different_resource_limits(self, container, container_image, image, host_info):
         differences = DifferenceTracker()
         for options, param_values in self.parameters:
             engine = options.get_engine(self.engine_driver.name)
             if not engine.can_update_value(self.engine_driver.get_api_version(self.client)):
                 continue
-            self._record_differences(differences, options, param_values, engine, container, image)
+            self._record_differences(differences, options, param_values, engine, container, container_image, image, host_info)
         has_differences = not differences.empty
         return has_differences, differences
 
@@ -531,8 +577,8 @@ class ContainerManager(DockerBaseClass):
             engine.update_value(self.module, result, self.engine_driver.get_api_version(self.client), options.options, values)
         return result
 
-    def update_limits(self, container, image):
-        limits_differ, different_limits = self.has_different_resource_limits(container, image)
+    def update_limits(self, container, container_image, image, host_info):
+        limits_differ, different_limits = self.has_different_resource_limits(container, container_image, image, host_info)
         if limits_differ:
             self.log("limit differences:")
             self.log(different_limits.get_legacy_docker_container_diffs(), pretty_print=True)
@@ -580,6 +626,8 @@ class ContainerManager(DockerBaseClass):
                         expected_links.append("%s:%s" % (link, alias))
                     if not compare_generic(expected_links, network_info.get('Links'), 'allow_more_present', 'set'):
                         diff = True
+                if network.get('mac_address') and network['mac_address'] != network_info.get('MacAddress'):
+                    diff = True
                 if diff:
                     different = True
                     differences.append(dict(
@@ -589,7 +637,8 @@ class ContainerManager(DockerBaseClass):
                             ipv4_address=network_info_ipam.get('IPv4Address'),
                             ipv6_address=network_info_ipam.get('IPv6Address'),
                             aliases=network_info.get('Aliases'),
-                            links=network_info.get('Links')
+                            links=network_info.get('Links'),
+                            mac_address=network_info.get('MacAddress'),
                         )
                     ))
         return different, differences
@@ -816,14 +865,15 @@ def run_module(engine_driver):
             image=dict(type='str'),
             image_comparison=dict(type='str', choices=['desired-image', 'current-image'], default='desired-image'),
             image_label_mismatch=dict(type='str', choices=['ignore', 'fail'], default='ignore'),
-            image_name_mismatch=dict(type='str', choices=['ignore', 'recreate'], default='ignore'),
+            image_name_mismatch=dict(type='str', choices=['ignore', 'recreate']),
             keep_volumes=dict(type='bool', default=True),
             kill_signal=dict(type='str'),
             name=dict(type='str', required=True),
             networks_cli_compatible=dict(type='bool', default=True),
             output_logs=dict(type='bool', default=False),
             paused=dict(type='bool'),
-            pull=dict(type='bool', default=False),
+            pull=dict(type='raw', choices=['never', 'missing', 'always', True, False], default='missing'),
+            pull_check_mode_behavior=dict(type='str', choices=['image_not_present', 'always'], default='image_not_present'),
             purge_networks=dict(type='bool', default=False, removed_in_version='4.0.0', removed_from_collection='community.docker'),
             recreate=dict(type='bool', default=False),
             removal_wait_timeout=dict(type='float'),

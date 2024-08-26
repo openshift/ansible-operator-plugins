@@ -17,6 +17,8 @@ version_added: 1.3.0
 description:
   - This module allows to install, delete, enable and disable Docker plugins.
   - Performs largely the same function as the C(docker plugin) CLI subcommand.
+notes:
+  - The C(--grant-all-permissions) CLI flag is true by default in this module.
 
 extends_documentation_fragment:
   - community.docker.docker.api_documentation
@@ -38,10 +40,10 @@ options:
 
   state:
     description:
-      - C(absent) remove the plugin.
-      - C(present) install the plugin, if it does not already exist.
-      - C(enable) enable the plugin.
-      - C(disable) disable the plugin.
+      - V(absent) remove the plugin.
+      - V(present) install the plugin, if it does not already exist.
+      - V(enable) enable the plugin.
+      - V(disable) disable the plugin.
     default: present
     choices:
       - absent
@@ -65,7 +67,7 @@ options:
   force_remove:
     description:
       - Remove even if the plugin is enabled.
-    default: False
+    default: false
     type: bool
 
   enable_timeout:
@@ -121,7 +123,7 @@ plugin:
 actions:
     description:
       - List of actions performed during task execution.
-    returned: when I(state!=absent)
+    returned: when O(state) is not V(absent)
     type: list
 '''
 
