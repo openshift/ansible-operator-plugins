@@ -1,0 +1,69 @@
+FROM registry.ci.openshift.org/ocp/4.17:base-rhel9
+
+RUN yum install -y rust cargo libffi-devel python3-devel gcc python3-pip
+    
+COPY ./Pipfile* ./
+
+# The build dependencies are required by cachito. Following script
+# does exactly the same. More info at: https://github.com/containerbuildsystem/cachito/blob/master/docs/pip.md#build-dependencies
+RUN curl -LO https://raw.githubusercontent.com/containerbuildsystem/cachito/master/bin/pip_find_builddeps.py \
+    && chmod +x pip_find_builddeps.py
+
+# Create requirements.in file from the pipenv created using the
+# same Pipfile and Pipfile.lock used for upstream image. Then
+# use pip-compile to generate the requirements.txt file. Copy
+# setuptools into requirements-build.txt as pip-compile will
+# omit it from the requierements.txt file.
+RUN python3 -m pip install pipenv==2023.11.15 \
+    && python3 -m pip install pip-tools \
+    && pipenv install --deploy \
+    # NOTE: This ignored vulnerability (70612) was detected in jinja2, \
+    # but the vulnerability is disputed and may never be fixed. See: \
+    #  - https://github.com/advisories/GHSA-f6pv-j8mr-w6rr \
+    #  - https://github.com/dbt-labs/dbt-core/issues/10250 \
+    #  - https://data.safetycli.com/v/70612/97c/ \
+    # NOTE: This ignored vulnerability (71064) was detected in requests, \
+    # but the upgraded version doesn't support the use case (protocol we are using).\
+    # Ref: https://github.com/operator-framework/ansible-operator-plugins/pull/67#issuecomment-2189164688
+    && pipenv check --ignore 70612 --ignore 71064 \
+    && pipenv run pip freeze --all  > ./requirements.in \
+    # Add wheel and setuptools to requirements-build.in file as these packages
+    # are part of the build dependencies of some packages in requirements.in file.
+    && grep "wheel==" ./requirements.in >> ./requirements-build.in || true \
+    && grep "setuptools==" ./requirements.in >> ./requirements-build.in || true \
+    && pip-compile --output-file=./requirements.txt ./requirements.in --strip-extras \
+    # NOTE: Comment out ansible-runner, ansible-runner-http and python-daemon as
+    # both ansible-runner and ansible-runner-http has python-daemon as dependency.
+    # pip_find_builddeps.py encounters an error when trying to get the build
+    # dependencies of python-daemon==3.0.1.
+    # TODO: Whenever a newer version of python-daemon is released check
+    # whether pip_find_builddeps.py is able to fetch its build dependencies
+    # without any error. If so, then remove the following lines which comments
+    # out ansible-runner, ansible-runner-http and python-daemon.
+    && sed -i '/ansible-runner==/s/^/#/g' ./requirements.txt \
+    && sed -i '/ansible-runner-http==/s/^/#/g' ./requirements.txt \
+    && sed -i '/python-daemon==/s/^/#/g' ./requirements.txt \
+    && ./pip_find_builddeps.py requirements.txt -o requirements-build.in --append \
+    # Uncomment ansible-runner, ansible-runner-http and python-daemon, so that
+    # they are re-enabled in the requirements.txt file.
+    && sed -i '/ansible-runner==/s/^#//g' ./requirements.txt \
+    && sed -i '/ansible-runner-http==/s/^#//g' ./requirements.txt \
+    && sed -i '/python-daemon==/s/^#//g' ./requirements.txt \
+    && pip-compile --output-file=./requirements-build.txt ./requirements-build.in --strip-extras --allow-unsafe \
+    # NOTE: Comment out cryptography and its dependencies from the requirements.txt
+    # and requirements-build.txt files as these packages can't be installed in the
+    # isolated environment of OSBS image build. These packages will be installed
+    # through rpms.
+    && sed -i '/cryptography==/s/^/#/g' ./requirements.txt \
+    && sed -i '/cffi==/s/^/#/g' ./requirements.txt \
+    && sed -i '/pycparser==/s/^/#/g' ./requirements.txt \
+    && sed -i '/cffi==/s/^/#/g' ./requirements-build.txt \
+    && sed -i '/pycparser==/s/^/#/g' ./requirements-build.txt \
+    && sed -i '/maturin==/s/^/#/g' ./requirements-build.txt \
+    # Add flit-core to requirements-pre-build.in file as this package is part of the
+    # build dependencies of some packages in requirements-build.txt file.
+    && grep "flit-core==" ./requirements-build.txt >> ./requirements-pre-build.in || true \
+    && pip-compile --output-file=./requirements-pre-build.txt ./requirements-pre-build.in --strip-extras
+
+VOLUME /tmp/requirements
+ENTRYPOINT ["cp", "./requirements.txt", "./requirements-build.txt", "./requirements-pre-build.txt", "/tmp/requirements/"]
