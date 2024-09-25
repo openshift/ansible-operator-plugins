@@ -1,0 +1,20 @@
+FROM basebuilder AS builder
+
+COPY . /go/src/github.com/openshift/ansible-operator-plugins
+
+ENV SKIP_SECRET_GENERATION=true
+
+RUN cd /go/src/github.com/openshift/ansible-operator-plugins && \
+  make generate
+
+FROM openshift-ansible-operator-plugins
+
+COPY --from=builder /go/src/github.com/openshift/ansible-operator-plugins/testdata/memcached-molecule-operator/requirements.yml ${HOME}/requirements.yml
+
+RUN ansible-galaxy collection install -r ${HOME}/requirements.yml \
+ && chmod -R ug+rwx ${HOME}/.ansible
+
+COPY --from=builder /go/src/github.com/openshift/ansible-operator-plugins/testdata/memcached-molecule-operator/watches.yaml ${HOME}/watches.yaml
+COPY --from=builder /go/src/github.com/openshift/ansible-operator-plugins/testdata/memcached-molecule-operator/roles/ ${HOME}/roles/
+COPY --from=builder /go/src/github.com/openshift/ansible-operator-plugins/testdata/memcached-molecule-operator/playbooks/ ${HOME}/playbooks/
+
