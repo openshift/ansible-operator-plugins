@@ -5,7 +5,9 @@ ENV GO111MODULE=on \
 
 COPY . /go/src/github.com/openshift/ansible-operator-plugins
 RUN cd /go/src/github.com/openshift/ansible-operator-plugins \
- && make build
+ && export SIMPLE_VERSION="$(make -pRrq --no-print-directory | grep '^IMAGE_VERSION' | awk -F'= ' '{print $2}')-ocp" \
+ && export GIT_VERSION="$(make -pRrq --no-print-directory | grep '^IMAGE_VERSION' | awk -F'= ' '{print $2}')-ocp" \
+ && make -e build
 
 FROM registry.ci.openshift.org/ocp/4.17:base-rhel9
 
