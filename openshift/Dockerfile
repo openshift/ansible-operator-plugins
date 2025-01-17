@@ -23,14 +23,16 @@ ENV HOME=/opt/ansible \
 
 # cryptography packages cannot be installed in the OSBS environment using pip.
 # Thus installing it via rpm.
-RUN yum clean all && rm -rf /var/cache/yum/* \
-    && yum update -y \
-    && yum install -y catatonit python3-cryptography python3-devel gcc python3-pip
+RUN dnf clean all && rm -rf /var/cache/dnf/* \
+    && dnf update -y \
+    && dnf install -y catatonit python3.12-cryptography python3.12-devel gcc \
+    && pushd /usr/local/bin && ln -sf ../../bin/python3.12 python3 && popd \
+    && python3 -m ensurepip --upgrade
 
 # pip install will install a higher version of the requests module. However, pip fails
 # to uninstall the existing request module as it is installed from rpm. Thus, removing
 # the module before using pip install.
-RUN yum remove -y python3-requests
+RUN dnf remove -y python3-requests
 
 # Add steps for cachito
 ENV REMOTE_SOURCES=${REMOTE_SOURCES:-"./openshift/"}
@@ -41,9 +43,9 @@ RUN chmod +x /install-ansible.sh \
     && ./install-ansible.sh
 
 # Remove packages which are only needed for cachito
-RUN yum remove -y python3-devel gcc \
-    && yum clean all \
-    && rm -rf /var/cache/yum
+RUN dnf remove -y gcc \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf
 
 COPY --from=builder /go/src/github.com/openshift/ansible-operator-plugins/ansible-operator /usr/local/bin/ansible-operator
 COPY openshift/release/ansible/ansible_collections ${HOME}/.ansible/collections/ansible_collections
