@@ -7,10 +7,10 @@ jobs:
     name: e2e
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version-file: "go.mod"
       - run: sudo rm -rf /usr/local/bin/kustomize
@@ -20,19 +20,19 @@ jobs:
     name: e2e-molecule
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version-file: "go.mod"
       - run: sudo rm -rf /usr/local/bin/kustomize
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
+          python-version: '3.12'
       - name: Run test e2e ansible molecule
         run: |
           env
           pip3 install --user --upgrade setuptools pip
-          pip3 install --user ansible-core~=2.15.0
+          pip3 install --user ansible-core~=2.17.4
           make test-e2e-ansible-molecule

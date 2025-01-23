@@ -82,7 +82,7 @@ func TestReconcile(t *testing.T) {
 			ManageStatus:    true,
 			Runner: &fake.Runner{
 				JobEvents: []eventapi.JobEvent{
-					eventapi.JobEvent{
+					{
 						Event:   eventapi.EventPlaybookOnStats,
 						Created: eventapi.EventTime{Time: eventTime},
 					},
@@ -126,7 +126,7 @@ func TestReconcile(t *testing.T) {
 									"failures":   int64(0),
 									"ok":         int64(0),
 									"skipped":    int64(0),
-									"completion": eventTime.Format("2006-01-02T15:04:05.99999999"),
+									"completion": eventTime.Format("2006-01-02T15:04:05.99999999+00:00"),
 								},
 								"message": "Awaiting next reconciliation",
 								"reason":  "Successful",
@@ -152,7 +152,7 @@ func TestReconcile(t *testing.T) {
 			ManageStatus: true,
 			Runner: &fake.Runner{
 				JobEvents: []eventapi.JobEvent{
-					eventapi.JobEvent{
+					{
 						Event:   eventapi.EventRunnerOnFailed,
 						Created: eventapi.EventTime{Time: eventTime},
 						EventData: map[string]interface{}{
@@ -161,7 +161,7 @@ func TestReconcile(t *testing.T) {
 							},
 						},
 					},
-					eventapi.JobEvent{
+					{
 						Event:   eventapi.EventPlaybookOnStats,
 						Created: eventapi.EventTime{Time: eventTime},
 					},
@@ -209,7 +209,7 @@ func TestReconcile(t *testing.T) {
 									"failures":   int64(0),
 									"ok":         int64(0),
 									"skipped":    int64(0),
-									"completion": eventTime.Format("2006-01-02T15:04:05.99999999"),
+									"completion": eventTime.Format("2006-01-02T15:04:05.99999999+00:00"),
 								},
 								"message": "new failure message",
 								"reason":  "Failed",
@@ -230,7 +230,7 @@ func TestReconcile(t *testing.T) {
 			ManageStatus: false,
 			Runner: &fake.Runner{
 				JobEvents: []eventapi.JobEvent{
-					eventapi.JobEvent{
+					{
 						Event:   eventapi.EventRunnerOnFailed,
 						Created: eventapi.EventTime{Time: eventTime},
 						EventData: map[string]interface{}{
@@ -239,7 +239,7 @@ func TestReconcile(t *testing.T) {
 							},
 						},
 					},
-					eventapi.JobEvent{
+					{
 						Event:   eventapi.EventPlaybookOnStats,
 						Created: eventapi.EventTime{Time: eventTime},
 					},
@@ -271,7 +271,7 @@ func TestReconcile(t *testing.T) {
 			ManageStatus:    true,
 			Runner: &fake.Runner{
 				JobEvents: []eventapi.JobEvent{
-					eventapi.JobEvent{
+					{
 						Event:   eventapi.EventPlaybookOnStats,
 						Created: eventapi.EventTime{Time: eventTime},
 					},
@@ -326,7 +326,7 @@ func TestReconcile(t *testing.T) {
 									"failures":   int64(0),
 									"ok":         int64(0),
 									"skipped":    int64(0),
-									"completion": eventTime.Format("2006-01-02T15:04:05.99999999"),
+									"completion": eventTime.Format("2006-01-02T15:04:05.99999999+00:00"),
 								},
 								"message": "Awaiting next reconciliation",
 								"reason":  "Successful",
@@ -353,7 +353,7 @@ func TestReconcile(t *testing.T) {
 			ManageStatus:    true,
 			Runner: &fake.Runner{
 				JobEvents: []eventapi.JobEvent{
-					eventapi.JobEvent{
+					{
 						Event:   eventapi.EventPlaybookOnStats,
 						Created: eventapi.EventTime{Time: eventTime},
 					},
@@ -383,7 +383,7 @@ func TestReconcile(t *testing.T) {
 									"failures":   int64(0),
 									"ok":         int64(0),
 									"skipped":    int64(0),
-									"completion": eventTime.Format("2006-01-02T15:04:05.99999999"),
+									"completion": eventTime.Format("2006-01-02T15:04:05.99999999+00:00"),
 								},
 								"message": "Awaiting next reconciliation",
 								"reason":  "Successful",
@@ -408,7 +408,7 @@ func TestReconcile(t *testing.T) {
 			ReconcilePeriod: 5 * time.Second,
 			Runner: &fake.Runner{
 				JobEvents: []eventapi.JobEvent{
-					eventapi.JobEvent{
+					{
 						Created: eventapi.EventTime{Time: eventTime},
 					},
 				},
@@ -432,7 +432,7 @@ func TestReconcile(t *testing.T) {
 									"failures":   int64(0),
 									"ok":         int64(0),
 									"skipped":    int64(0),
-									"completion": eventTime.Format("2006-01-02T15:04:05.99999999"),
+									"completion": eventTime.Format("2006-01-02T15:04:05.99999999+00:00"),
 								},
 								"message": "Failed to get ansible-runner stdout",
 							},
@@ -458,7 +458,7 @@ func TestReconcile(t *testing.T) {
 			ManageStatus:    false,
 			Runner: &fake.Runner{
 				JobEvents: []eventapi.JobEvent{
-					eventapi.JobEvent{
+					{
 						Event:   eventapi.EventPlaybookOnStats,
 						Created: eventapi.EventTime{Time: eventTime},
 					},
