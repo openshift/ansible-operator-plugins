@@ -294,7 +294,6 @@ func (r *runner) Run(ident string, u *unstructured.Unstructured, kubeconfig stri
 		if err = os.Symlink(currentRun, latestArtifacts); err != nil {
 			logger.Error(err, "Error symlinking latest artifacts")
 		}
-
 	}()
 
 	return &runResult{
@@ -367,6 +366,7 @@ func (r *runner) makeParameters(u *unstructured.Unstructured) map[string]interfa
 	specKey := fmt.Sprintf("%s_spec", objKey)
 	parameters[specKey] = spec
 	if r.markUnsafe {
+		parameters[objKey] = markUnsafe(u.Object)
 		parameters[specKey] = markUnsafe(spec)
 	}
 
