@@ -22,14 +22,13 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
-	kbutil "sigs.k8s.io/kubebuilder/v3/pkg/plugin/util"
+	kbutil "sigs.k8s.io/kubebuilder/v4/pkg/plugin/util"
 
 	"github.com/operator-framework/ansible-operator-plugins/hack/generate/samples/internal/pkg"
 	"github.com/operator-framework/ansible-operator-plugins/pkg/testutils/sample"
 )
 
 func ImplementMemcachedMolecule(sample sample.Sample, image string) {
-
 	for _, gvk := range sample.GVKs() {
 		moleculeTaskPath := filepath.Join(sample.Dir(), "molecule", "default", "tasks",
 			fmt.Sprintf("%s_test.yml", strings.ToLower(gvk.Kind)))
@@ -73,7 +72,6 @@ func ImplementMemcachedMolecule(sample sample.Sample, image string) {
 				fixmeAssert, "")
 			pkg.CheckError(fmt.Sprintf("replacing %s_test.yml", strings.ToLower(gvk.Kind)), err)
 		}
-
 	}
 
 	log.Info("replacing project Dockerfile to use ansible base image with the dev tag")
@@ -82,7 +80,7 @@ func ImplementMemcachedMolecule(sample sample.Sample, image string) {
 
 	log.Info("adding RBAC permissions")
 	err = kbutil.ReplaceInFile(filepath.Join(sample.Dir(), "config", "rbac", "role.yaml"),
-		"#+kubebuilder:scaffold:rules", rolesForBaseOperator)
+		"# +kubebuilder:scaffold:rules", rolesForBaseOperator)
 	pkg.CheckError("replacing in role.yml", err)
 
 	log.Info("adding task to delete config map")
@@ -122,7 +120,8 @@ func ImplementMemcachedMolecule(sample sample.Sample, image string) {
 	pkg.CheckError("adding watch_namespace_patch.yaml", err)
 
 	log.Info("adding WATCH_NAMESPACE env patch to patch list to be applied")
-	err = kbutil.InsertCode(filepath.Join(sample.Dir(), "config", "testing", "kustomization.yaml"), "patchesStrategicMerge:",
-		fmt.Sprintf("\n- %s", watchNamespacePatchFileName))
+	err = kbutil.InsertCode(filepath.Join(sample.Dir(), "config", "testing", "kustomization.yaml"), "patches:",
+		fmt.Sprintf("\n- path: %s", watchNamespacePatchFileName))
 	pkg.CheckError("inserting in kustomization.yaml", err)
+
 }

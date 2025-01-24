@@ -22,7 +22,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	kbutil "sigs.k8s.io/kubebuilder/v3/pkg/plugin/util"
+	kbutil "sigs.k8s.io/kubebuilder/v4/pkg/plugin/util"
 
 	"github.com/operator-framework/ansible-operator-plugins/hack/generate/samples/internal/pkg"
 	"github.com/operator-framework/ansible-operator-plugins/pkg/testutils/command"
@@ -110,13 +110,13 @@ func updateConfig(dir string) {
 #+kubebuilder:scaffold:rules`
 	err := kbutil.ReplaceInFile(
 		filepath.Join(dir, "config", "rbac", "role.yaml"),
-		"#+kubebuilder:scaffold:rules",
+		"# +kubebuilder:scaffold:rules",
 		cmRolesFragment)
 	pkg.CheckError("adding customized roles", err)
 
 	log.Info("adding manager arg")
 	const ansibleVaultArg = `
-        - --ansible-args='--vault-password-file /opt/ansible/pwd.yml'`
+          - --ansible-args='--vault-password-file /opt/ansible/pwd.yml'`
 	err = kbutil.InsertCode(
 		filepath.Join(dir, "config", "manager", "manager.yaml"),
 		"- --leader-election-id=advanced-molecule-operator",
@@ -135,20 +135,11 @@ func updateConfig(dir string) {
 		managerEnv)
 	pkg.CheckError("adding manager env", err)
 
-	log.Info("adding vaulting args to the proxy auth")
-	const managerAuthArgs = `
-        - "--ansible-args='--vault-password-file /opt/ansible/pwd.yml'"`
-	err = kbutil.InsertCode(
-		filepath.Join(dir, "config", "default", "manager_auth_proxy_patch.yaml"),
-		"- \"--leader-elect\"",
-		managerAuthArgs)
-	pkg.CheckError("adding vaulting args to the proxy auth", err)
-
 	log.Info("adding task to not pull image to the config/testing")
 	err = kbutil.ReplaceInFile(
 		filepath.Join(dir, "config", "testing", "kustomization.yaml"),
-		"- manager_image.yaml",
-		"- manager_image.yaml\n- pull_policy/Never.yaml")
+		"- path: manager_image.yaml",
+		"- path: manager_image.yaml\n- path: pull_policy/Never.yaml")
 	pkg.CheckError("adding task to not pull image to the config/testing", err)
 }
 
@@ -194,7 +185,6 @@ func addMocksFromTestdata(dir string, cc command.CommandContext) {
 	cmd = exec.Command("cp", filepath.Join(testDataAbsPath, "/playbooks/finalizerconcurrencyfinalizer.yml"), filepath.Join(dir, "playbooks/finalizerconcurrencyfinalizer.yml"))
 	_, err = cc.Run(cmd)
 	pkg.CheckError("adding finalizer for finalizerconccurencytest", err)
-
 }
 
 func updateDockerfile(dir string) {

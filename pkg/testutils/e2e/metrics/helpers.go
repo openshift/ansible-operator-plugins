@@ -8,6 +8,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+
 	"github.com/operator-framework/ansible-operator-plugins/pkg/testutils/kubernetes"
 	"github.com/operator-framework/ansible-operator-plugins/pkg/testutils/sample"
 	"github.com/operator-framework/ansible-operator-plugins/test/common"
@@ -80,7 +81,7 @@ func GetMetrics(sample sample.Sample, kubectl kubernetes.Kubectl, metricsCluster
 		gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred())
 		return metricsOutput
 	}
-	gomega.Eventually(getCurlLogs, time.Minute, time.Second).Should(gomega.ContainSubstring("< HTTP/2 200"))
+	gomega.Eventually(getCurlLogs, time.Minute, time.Second).Should(gomega.ContainSubstring("< HTTP/1.1 200"))
 
 	return metricsOutput
 }
