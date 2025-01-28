@@ -21,15 +21,13 @@ RUN set -e && yum clean all && rm -rf /var/cache/yum/* \
   && pip3 install --upgrade pip~=23.3.2 \
   && pip3 install pipenv==2023.11.15 \
   && pipenv lock \
-  # NOTE: This ignored vulnerability (70612) was detected in jinja2, \
-  # but the vulnerability is disputed and may never be fixed. See: \
-  #  - https://github.com/advisories/GHSA-f6pv-j8mr-w6rr \
-  #  - https://github.com/dbt-labs/dbt-core/issues/10250 \
-  #  - https://data.safetycli.com/v/70612/97c/ \
   # NOTE: This ignored vulnerability (71064) was detected in requests, \
   # but the upgraded version doesn't support the use case (protocol we are using).\
   # Ref: https://github.com/operator-framework/ansible-operator-plugins/pull/67#issuecomment-2189164688
-  && pipenv check --ignore 70612 --ignore 71064 \
+  # NOTE: This ignored vulnerability (74261) was detected in ansible-core, \
+  # but the fix is not available in any 2.15.z version of ansible-core as it has already reached EOL, See: \
+  #  - https://docs.ansible.com/ansible/latest/reference_appendices/release_and_maintenance.html#ansible-core-support-matrix
+  && pipenv check --ignore 71064 --ignore 74261 \
   && yum remove -y gcc libffi-devel openssl-devel python39-devel \
   && yum clean all \
   && rm -rf /var/cache/yum

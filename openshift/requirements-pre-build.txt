@@ -4,5 +4,5 @@
 #
 #    pip-compile --output-file=./requirements-pre-build.txt --strip-extras ./requirements-pre-build.in
 #
-flit-core==3.9.0
+flit-core==3.10.1
     # via -r ./requirements-pre-build.in
