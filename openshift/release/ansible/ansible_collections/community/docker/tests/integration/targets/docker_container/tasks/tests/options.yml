@@ -1144,6 +1144,66 @@
   when: docker_api_version is version('1.40', '<')
 
 ####################################################################
+## device_cgroup_rules ###################################################
+####################################################################
+
+- name: device_cgroup_rules
+  docker_container:
+    image: "{{ docker_test_image_alpine }}"
+    command: '/bin/sh -c "sleep 10m"'
+    name: "{{ cname }}"
+    state: started
+    force_kill: true
+    device_cgroup_rules:
+    - "c 42:* rmw"
+  register: device_cgroup_rules_1
+  ignore_errors: true
+
+- name: cgroupns_mode (idempotency)
+  docker_container:
+    image: "{{ docker_test_image_alpine }}"
+    command: '/bin/sh -c "sleep 10m"'
+    name: "{{ cname }}"
+    state: started
+    force_kill: true
+    device_cgroup_rules:
+    - "c 42:* rmw"
+  register: device_cgroup_rules_2
+  ignore_errors: true
+
+- name: cgroupns_mode (changed)
+  docker_container:
+    image: "{{ docker_test_image_alpine }}"
+    command: '/bin/sh -c "sleep 10m"'
+    name: "{{ cname }}"
+    state: started
+    force_kill: true
+    device_cgroup_rules:
+    - "c 189:* rmw"
+  register: device_cgroup_rules_3
+  ignore_errors: true
+
+- name: cleanup
+  docker_container:
+    name: "{{ cname }}"
+    state: absent
+    force_kill: true
+  diff: false
+
+- assert:
+    that:
+    - device_cgroup_rules_1 is changed
+    - device_cgroup_rules_2 is not changed
+    - device_cgroup_rules_3 is changed
+  when: docker_api_version is version('1.28', '>=')
+- assert:
+    that:
+    - device_cgroup_rules_1 is failed
+    - |
+      ('API version is ' ~ docker_api_version ~ '.') in device_cgroup_rules_1.msg and 'Minimum version required is 1.28 ' in device_cgroup_rules_1.msg
+  when: docker_api_version is version('1.28', '<')
+
+####################################################################
 ## dns_opts ########################################################
 ####################################################################
 
@@ -3545,13 +3605,13 @@ avoid such warnings, please quote the value.' in (log_options_2.warnings | defau
 ## platform ########################################################
 ####################################################################
 
-- name: Remove hello-world image
+- name: Remove test image
   docker_image_remove:
-    name: hello-world:latest
+    name: "{{ docker_test_image_simple_1 }}"
 
 - name: platform
   docker_container:
-    image: hello-world:latest
+    image: "{{ docker_test_image_simple_1 }}"
     name: "{{ cname }}"
     state: present
     pull: true
@@ -3564,7 +3624,7 @@ avoid such warnings, please quote the value.' in (log_options_2.warnings | defau
   # Docker daemon only returns 'linux' as the platform for the container,
   # so this has to be handled correctly by our additional code
   docker_container:
-    image: hello-world:latest
+    image: "{{ docker_test_image_simple_1 }}"
     name: "{{ cname }}"
     state: present
     platform: linux/amd64
@@ -3574,7 +3634,7 @@ avoid such warnings, please quote the value.' in (log_options_2.warnings | defau
 
 - name: platform (idempotency with shorter name)
   docker_container:
-    image: hello-world:latest
+    image: "{{ docker_test_image_simple_1 }}"
     name: "{{ cname }}"
     state: present
     platform: linux
@@ -3584,7 +3644,7 @@ avoid such warnings, please quote the value.' in (log_options_2.warnings | defau
 
 - name: platform (idempotency with shorter name)
   docker_container:
-    image: hello-world:latest
+    image: "{{ docker_test_image_simple_1 }}"
     name: "{{ cname }}"
     state: present
     platform: amd64
@@ -3594,7 +3654,7 @@ avoid such warnings, please quote the value.' in (log_options_2.warnings | defau
 
 - name: platform (changed)
   docker_container:
-    image: hello-world:latest
+    image: "{{ docker_test_image_simple_1 }}"
     name: "{{ cname }}"
     state: present
     pull: true
@@ -3609,7 +3669,7 @@ avoid such warnings, please quote the value.' in (log_options_2.warnings | defau
 
 - name: platform (idempotency)
   docker_container:
-    image: hello-world:latest
+    image: "{{ docker_test_image_simple_1 }}"
     name: "{{ cname }}"
     state: present
     pull: true
@@ -3890,6 +3950,7 @@ avoid such warnings, please quote the value.' in (log_options_2.warnings | defau
     - '[fe80::1%test]:90:90/tcp'
     force_kill: true
   register: published_ports_5
+  when: docker_host_info.host_info.ServerVersion is version('27.0.0', '<')
 
 - name: published_ports (ports with IP addresses, idempotent)
   docker_container:
@@ -3902,6 +3963,7 @@ avoid such warnings, please quote the value.' in (log_options_2.warnings | defau
     - '[::1]:9003:9003/tcp'
     - '[fe80::1%test]:90:90/tcp'
   register: published_ports_6
+  when: docker_host_info.host_info.ServerVersion is version('27.0.0', '<')
 
 - name: published_ports (no published ports)
   docker_container:
@@ -3977,8 +4039,8 @@ avoid such warnings, please quote the value.' in (log_options_2.warnings | defau
     - published_ports_2 is not changed
     - published_ports_3 is not changed
     - published_ports_4 is changed
-    - published_ports_5 is changed
-    - published_ports_6 is not changed
+    - (published_ports_5 is changed and published_ports_5 is not skipped) or published_ports_5 is skipped
+    - (published_ports_6 is not changed and published_ports_6 is not skipped) or published_ports_6 is skipped
     - published_ports_7 is changed
     - published_ports_8 is changed
     - published_ports_9 is changed

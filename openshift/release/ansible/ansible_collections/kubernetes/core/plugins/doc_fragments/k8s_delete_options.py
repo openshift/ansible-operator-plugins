@@ -11,12 +11,11 @@ __metaclass__ = type
 
 
 class ModuleDocFragment(object):
-
     DOCUMENTATION = r"""
 options:
   delete_options:
     type: dict
-    version_added: '1.2.0'
+    version_added: 1.2.0
     description:
     - Configure behavior when deleting an object.
     - Only used when I(state=absent).

@@ -28,10 +28,9 @@ EXAMPLES = r"""
 - name: Fail with additional arguments
   cloud.common.turbo_fail:
     params:
-        test: "ansible"
+      test: "ansible"
 """
 
-import os
 
 from ansible_collections.cloud.common.plugins.module_utils.turbo.module import (
     AnsibleTurboModule as AnsibleModule,

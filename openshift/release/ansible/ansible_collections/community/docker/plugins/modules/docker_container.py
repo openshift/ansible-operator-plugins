@@ -299,6 +299,12 @@ options:
           - Driver-specific options.
         type: dict
     version_added: 0.1.0
+  device_cgroup_rules:
+    description:
+      - List of cgroup rules to apply to the container.
+    type: list
+    elements: str
+    version_added: 3.11.0
   dns_opts:
     description:
       - List of DNS options.
@@ -340,6 +346,9 @@ options:
     description:
       - Dict of host-to-IP mappings, where each host name is a key in the dictionary.
         Each host name will be added to the container's C(/etc/hosts) file.
+      - Instead of an IP address, the special value V(host-gateway) can also be used, which
+        resolves to the host's gateway IP and allows containers to connect to services running
+        on the host.
     type: dict
   exposed_ports:
     description:
@@ -372,6 +381,7 @@ options:
       - "O(healthcheck.interval), O(healthcheck.timeout), O(healthcheck.start_period), and O(healthcheck.start_interval) are specified as durations.
         They accept duration as a string in a format that look like: V(5h34m56s), V(1m30s), and so on.
         The supported units are V(us), V(ms), V(s), V(m) and V(h)."
+      - See also O(state=healthy).
     type: dict
     suboptions:
       test:
@@ -712,6 +722,9 @@ options:
         description:
           - Endpoint MAC address (for example, V(92:d0:c6:0a:29:33)).
           - This is only available for Docker API version 1.44 and later.
+          - Please note that when a container is attached to a network after creation,
+            this is currently ignored by the Docker Daemon at least in some cases.
+            When passed on creation, this seems to work better.
         type: str
         version_added: 3.6.0
   networks_cli_compatible:
@@ -910,6 +923,11 @@ options:
         with the requested config.'
       - 'V(started) - Asserts that the container is first V(present), and then if the container is not running moves it to a running
         state. Use O(restart) to force a matching container to be stopped and restarted.'
+      - V(healthy) - Asserts that the container is V(present) and V(started), and is actually healthy as well.
+        This means that the conditions defined in O(healthcheck) respectively in the image's C(HEALTHCHECK)
+        (L(Docker reference for HEALTHCHECK, https://docs.docker.com/reference/dockerfile/#healthcheck))
+        are satisfied.
+        The time waited can be controlled with O(healthy_wait_timeout). This state has been added in community.docker 3.11.0.
       - 'V(stopped) - Asserts that the container is first V(present), and then if the container is running moves it to a stopped
         state.'
       - "To control what will be taken into account when comparing configuration, see the O(comparisons) option. To avoid that the
@@ -923,12 +941,23 @@ options:
     choices:
       - absent
       - present
+      - healthy
       - stopped
       - started
   stop_signal:
     description:
       - Override default signal used to stop the container.
     type: str
+  healthy_wait_timeout:
+    description:
+      - When waiting for the container to become healthy if O(state=healthy), this option controls how long
+        the module waits until the container state becomes healthy.
+      - The timeout is specified in seconds. The default, V(300), is 5 minutes.
+      - Set this to 0 or a negative value to wait indefinitely.
+        Note that depending on the container this can result in the module not terminating.
+    default: 300
+    type: float
+    version_added: 3.11.0
   stop_timeout:
     description:
       - Number of seconds to wait for the container to stop before sending C(SIGKILL).

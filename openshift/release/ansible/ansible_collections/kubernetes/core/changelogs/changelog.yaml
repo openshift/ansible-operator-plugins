@@ -762,20 +762,106 @@ releases:
       name: helm_pull
       namespace: ''
     release_date: '2023-01-24'
-  2.4.1:
+  3.0.0:
     changes:
-      release_summary: The kubernetes.core 2.4.1 release includes several trivial
-        bug fixes related to sanity.
+      breaking_changes:
+      - Remove support for ansible-core < 2.14
+      - Update python kubernetes library to 24.2.0, helm/kind-action to 1.8.0, kubernetes
+        >= 1.24.
+      bugfixes:
+      - helm - Put the chart_ref into quotes when running ``helm show chart``, ``helm
+        upgrade`` and ``helm dependency update`` commands (https://github.com/ansible-collections/kubernetes.core/issues/653).
+      - helm - delete temporary file created when deploying chart with option ``release_values``
+        set (https://github.com/ansible-collections/kubernetes.core/issues/530).
+      - helm - fix issue occurring when uninstalling chart with statues others than
+        ``deployed`` (https://github.com/ansible-collections/kubernetes.core/issues/319).
+      - helm - fix post_renderer argument breaking the helm deploy_command (https://github.com/ansible-collections/kubernetes.core/pull/586).
+      - helm - use post_renderer when checking ``changed`` status for a helm release
+        (https://github.com/ansible-collections/kubernetes.core/pull/588).
+      - k8s_scale - clean handling of ResourceTimeout exception (https://github.com/ansible-collections/kubernetes.core/issues/583).
+      - k8s_scale - fix issue when scaling StatefulSets with ``updateStrategy=OnDelete``
+        (https://github.com/ansible-collections/kubernetes.core/issues/579).
+      deprecated_features:
+      - k8s - the ``k8s`` inventory plugin has been deprecated and will be removed
+        in release 4.0.0 (https://github.com/ansible-collections/kubernetes.core/issues/31).
+      minor_changes:
+      - helm - add ``reuse_values`` and ``reset_values`` support to helm module (https://github.com/ansible-collections/kubernetes.core/issues/394).
+      - k8s - add new option ``delete_all`` to support deletion of all resources when
+        state is set to ``absent``. (https://github.com/ansible-collections/kubernetes.core/issues/504)
+      - k8s, k8s_info - add a hidden_fields option to allow fields to be hidden in
+        the results of k8s and k8s_info
+      - k8s_drain - add ability to filter the list of pods to be drained by a pod
+        label selector (https://github.com/ansible-collections/kubernetes.core/issues/474).
+      release_summary: This major release drops support for ansible-core versions
+        lower than 2.14, Python versions lower than 3.9 and updates python kubernetes
+        library to 24.2.0, helm/kind-action to 1.8.0, kubernetes >= 1.24, along with
+        bug fixes and minor changes.
     fragments:
-    - fix_sanity_errors.yml
-    release_date: '2024-02-06'
-  2.4.2:
+    - 20230206-deprecate-k8s-inventory.yml
+    - 20231110-helm-quote-ref.yaml
+    - 517-k8s-make-name-optional.yaml
+    - 575-helm-add-support-for-reuse_values-and-reset_values.yml
+    - 579-k8s_scale-fix-issue-with-scaling-statefulsets.yml
+    - 583-k8s_scale-clean-handling-of-ResourceTimeout-exception.yaml
+    - 586-helm-fix-post-renderer-arg.yml
+    - 588-helm-use-post-renderer-for-helmdiff.yml
+    - 589-helm-uninstall-chart-releases-with-statuses-different-than-deployed.yaml
+    - 606-k8s_drain-add-pod_selectors-parameter.yaml
+    - 612-fix-helm-tests.yaml
+    - 629-add-hidden-fields-option.yaml
+    - gha-sanity-fixes.yaml
+    - helm-delete-temporary-file-created-when-using-option-release_values.yaml
+    - remove_ansible_2_13.yaml
+    - update_supported_versions.yaml
+    release_date: '2023-11-17'
+  3.0.1:
     changes:
       bugfixes:
       - Resolve Collections util resource discovery fails when complex subresources
         present (https://github.com/ansible-collections/kubernetes.core/pull/676).
-      release_summary: fix resource discovery when complex subresources present
+      - align `helmdiff_check()` function commandline rendering with the `deploy()`
+        function (https://github.com/ansible-collections/kubernetes.core/pull/670).
+      - helm - use ``reuse-values`` when running ``helm diff`` command (https://github.com/ansible-collections/kubernetes.core/issues/680).
+      - integrations test helm_kubeconfig - set helm version to v3.10.3 to avoid incompatability
+        with new bitnami charts (https://github.com/ansible-collections/kubernetes.core/pull/670).
+      release_summary: This release fixes issue with resources discovery when complex
+        subresources are present, and fixes issues with `reuse-values` parameter for
+        helm module.
     fragments:
-    - 2.4.2.yml
+    - 20240117-fix-helm-diff-cmd-line-rendering.yml
     - 20240222-Collections-util-resource-discovery-fails-when-complex-subresources-present.yml
+    - 20240228-fix-helm-diff-with-reuse-values.yml
+    - 3.0.1.yml
     release_date: '2024-03-01'
+  3.1.0:
+    changes:
+      bugfixes:
+      - helm - expand kubeconfig path with user's home directory for consistency with
+        k8s
+      - k8s_json_patch - rename action symlink to ensure k8s action plugin is used
+        (https://github.com/ansible-collections/kubernetes.core/pull/652).
+      minor_changes:
+      - kubectl - added support of local enviroment variable that will be used for
+        kubectl and may be requried for establishing connections ifself (https://github.com/ansible-collections/kubernetes.core/pull/702)
+      - kustomize - new parameter added to --enable-helm (https://github.com/ansible-collections/kubernetes.core/issues/568)
+      release_summary: This release comes with some bugfixes and documentation updates.
+        It also adds new features to the kubectl connection plugin and the kustomize
+        lookup plugin.
+    fragments:
+    - 20240426-add-support-of-kubectl-local-env-vars-for-connection-plugin.yml
+    - 3.1.0.yml
+    - 592-kustomize-helm-support.yml
+    - 652-fix-json-patch-action.yml
+    - 654-helm-expand-user.yml
+    release_date: '2024-05-16'
+  3.2.0:
+    changes:
+      minor_changes:
+      - inventory/k8s.py - Defer removal of k8s inventory plugin to version 6.0.0 (https://github.com/ansible-collections/kubernetes.core/pull/734).
+      - connection/kubectl.py - Added an example of using the kubectl connection plugin to the documentation (https://github.com/ansible-collections/kubernetes.core/pull/741).
+      release_summary: This release comes with documentation updates.
+    fragments:
+    - 20240530-defer-removal-and-ansible-core-support-update.yaml
+    - 20240601-doc-example-of-using-kubectl.yaml
+    - 3.2.0.yml
+    release_date: '2024-06-14'
