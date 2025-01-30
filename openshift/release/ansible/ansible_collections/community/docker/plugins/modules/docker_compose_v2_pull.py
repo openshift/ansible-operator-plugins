@@ -47,6 +47,25 @@ options:
       - always
       - missing
     default: always
+  ignore_buildable:
+    description:
+      - If set to V(true), will not pull images that can be built.
+    type: bool
+    default: false
+    version_added: 3.12.0
+  include_deps:
+    description:
+      - If set to V(true), also pull services that are declared as dependencies.
+      - This only makes sense if O(services) is used.
+    type: bool
+    default: false
+    version_added: 3.12.0
+  services:
+    description:
+      - Specifies a subset of services to be targeted.
+    type: list
+    elements: str
+    version_added: 3.12.0
 
 author:
   - Felix Fontein (@felixfontein)
@@ -114,26 +133,39 @@ class PullManager(BaseComposeManager):
         parameters = self.client.module.params
 
         self.policy = parameters['policy']
+        self.ignore_buildable = parameters['ignore_buildable']
+        self.include_deps = parameters['include_deps']
+        self.services = parameters['services'] or []
 
         if self.policy != 'always' and self.compose_version < LooseVersion('2.22.0'):
             # https://github.com/docker/compose/pull/10981 - 2.22.0
             self.fail('A pull policy other than always is only supported since Docker Compose 2.22.0. {0} has version {1}'.format(
+                self.client.get_cli(), self.compose_version))
+        if self.ignore_buildable and self.compose_version < LooseVersion('2.15.0'):
+            # https://github.com/docker/compose/pull/10134 - 2.15.0
+            self.fail('--ignore-buildable is only supported since Docker Compose 2.15.0. {0} has version {1}'.format(
                 self.client.get_cli(), self.compose_version))
 
     def get_pull_cmd(self, dry_run, no_start=False):
         args = self.get_base_args() + ['pull']
         if self.policy != 'always':
             args.extend(['--policy', self.policy])
+        if self.ignore_buildable:
+            args.append('--ignore-buildable')
+        if self.include_deps:
+            args.append('--include-deps')
         if dry_run:
             args.append('--dry-run')
         args.append('--')
+        for service in self.services:
+            args.append(service)
         return args
 
     def run(self):
         result = dict()
         args = self.get_pull_cmd(self.check_mode)
         rc, stdout, stderr = self.client.call_cli(*args, cwd=self.project_src)
-        events = self.parse_events(stderr, dry_run=self.check_mode)
+        events = self.parse_events(stderr, dry_run=self.check_mode, nonzero_rc=rc != 0)
         self.emit_warnings(events)
         self.update_result(result, events, stdout, stderr, ignore_service_pull_events=self.policy != 'missing' and not self.check_mode)
         self.update_failed(result, events, args, stdout, stderr, rc)
@@ -144,6 +176,9 @@ class PullManager(BaseComposeManager):
 def main():
     argument_spec = dict(
         policy=dict(type='str', choices=['always', 'missing'], default='always'),
+        ignore_buildable=dict(type='bool', default=False),
+        include_deps=dict(type='bool', default=False),
+        services=dict(type='list', elements='str'),
     )
     argspec_ex = common_compose_argspec_ex()
     argument_spec.update(argspec_ex.pop('argspec'))
@@ -151,6 +186,7 @@ def main():
     client = AnsibleModuleDockerClient(
         argument_spec=argument_spec,
         supports_check_mode=True,
+        needs_api_version=False,
         **argspec_ex
     )
 
