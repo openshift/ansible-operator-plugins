@@ -28,3 +28,12 @@ generate-requirements: build-requirements
 .PHONY: check-requirements
 check-requirements: generate-requirements
 	git diff --exit-code # fast-fail if generate-requirements produced changes
+
+.PHONY: update-collections
+update-collections:
+	cp testdata/memcached-molecule-operator/requirements.yml openshift/release/ansible/requirements.yml
+	./openshift/release/ansible/update-collections.sh
+
+.PHONY: check-collections
+check-collections: update-collections
+	git diff --exit-code # fast-fail if check-collections produced changes
