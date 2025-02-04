@@ -23,3 +23,5 @@ aliases:
 
   # Contributors who can review and LGTM any PRs in the repo.
   sdk-reviewers:
+  - emmajiafan
+  - KeenonLee
