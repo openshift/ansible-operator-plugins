@@ -2,7 +2,7 @@
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 DOCUMENTATION = r"""
-lookup: turbo_demo
+name: turbo_demo
 author:
   - Aubin Bikouo (@abikouo)
 
@@ -13,6 +13,7 @@ options:
   playbook_vars:
     description: list of playbook variables to add in the output.
     type: list
+    elements: str
 """
 
 EXAMPLES = r"""
@@ -43,7 +44,7 @@ if True:  # pylint: disable=using-constant-test
 
 async def execute(terms, variables, playbook_vars):
     result = []
-    result.append("running from pid: {pid}".format(pid=os.getpid()))
+    result.append(f"running from pid: {os.getpid()}")
     if playbook_vars is not None:
         result += [
             variables["vars"].get(x) for x in playbook_vars if x in variables["vars"]
@@ -56,7 +57,7 @@ async def execute(terms, variables, playbook_vars):
             if fname == __file__:
                 continue
 
-    result.append("turbo_demo_counter: {0}".format(counter()))
+    result.append(f"turbo_demo_counter: {counter()}")
     return result
 
 

@@ -13,6 +13,7 @@ import shlex
 from ansible.module_utils.basic import AnsibleModule, env_fallback
 from ansible.module_utils.common.process import get_bin_path
 from ansible.module_utils.common.text.converters import to_native
+from ansible.module_utils.six import string_types
 
 from ansible_collections.community.docker.plugins.module_utils.version import LooseVersion
 
@@ -30,7 +31,7 @@ from ansible_collections.community.docker.plugins.module_utils.util import (  # 
 
 DOCKER_COMMON_ARGS = dict(
     docker_cli=dict(type='path'),
-    docker_host=dict(type='str', default=DEFAULT_DOCKER_HOST, fallback=(env_fallback, ['DOCKER_HOST']), aliases=['docker_url']),
+    docker_host=dict(type='str', fallback=(env_fallback, ['DOCKER_HOST']), aliases=['docker_url']),
     tls_hostname=dict(type='str', fallback=(env_fallback, ['DOCKER_TLS_HOSTNAME'])),
     api_version=dict(type='str', default='auto', fallback=(env_fallback, ['DOCKER_API_VERSION']), aliases=['docker_api_version']),
     ca_path=dict(type='path', aliases=['ca_cert', 'tls_ca_cert', 'cacert_path']),
@@ -48,7 +49,7 @@ class DockerException(Exception):
 
 
 class AnsibleDockerClientBase(object):
-    def __init__(self, common_args, min_docker_api_version=None):
+    def __init__(self, common_args, min_docker_api_version=None, needs_api_version=True):
         self._environment = {}
         if common_args['tls_hostname']:
             self._environment['DOCKER_TLS_HOSTNAME'] = common_args['tls_hostname']
@@ -62,7 +63,11 @@ class AnsibleDockerClientBase(object):
                 self.fail('Cannot find docker CLI in path. Please provide it explicitly with the docker_cli parameter')
 
         self._cli_base = [self._cli]
-        self._cli_base.extend(['--host', common_args['docker_host']])
+        docker_host = common_args['docker_host']
+        if not docker_host and not common_args['cli_context']:
+            docker_host = DEFAULT_DOCKER_HOST
+        if docker_host:
+            self._cli_base.extend(['--host', docker_host])
         if common_args['validate_certs']:
             self._cli_base.append('--tlsverify')
         elif common_args['tls']:
@@ -80,11 +85,19 @@ class AnsibleDockerClientBase(object):
         dummy, self._version, dummy = self.call_cli_json('version', '--format', '{{ json . }}', check_rc=True)
         self._info = None
 
-        self.docker_api_version_str = self._version['Server']['ApiVersion']
-        self.docker_api_version = LooseVersion(self.docker_api_version_str)
-        min_docker_api_version = min_docker_api_version or '1.25'
-        if self.docker_api_version < LooseVersion(min_docker_api_version):
-            self.fail('Docker API version is %s. Minimum version required is %s.' % (self.docker_api_version_str, min_docker_api_version))
+        if needs_api_version:
+            if not isinstance(self._version.get('Server'), dict) or not isinstance(self._version['Server'].get('ApiVersion'), string_types):
+                self.fail('Cannot determine Docker Daemon information. Are you maybe using podman instead of docker?')
+            self.docker_api_version_str = to_native(self._version['Server']['ApiVersion'])
+            self.docker_api_version = LooseVersion(self.docker_api_version_str)
+            min_docker_api_version = min_docker_api_version or '1.25'
+            if self.docker_api_version < LooseVersion(min_docker_api_version):
+                self.fail('Docker API version is %s. Minimum version required is %s.' % (self.docker_api_version_str, min_docker_api_version))
+        else:
+            self.docker_api_version_str = None
+            self.docker_api_version = None
+            if min_docker_api_version is not None:
+                self.fail('Internal error: cannot have needs_api_version=False with min_docker_api_version not None')
 
     def log(self, msg, pretty_print=False):
         pass
@@ -164,7 +177,10 @@ class AnsibleDockerClientBase(object):
         return self._info
 
     def get_client_plugin_info(self, component):
-        for plugin in self.get_cli_info()['ClientInfo'].get('Plugins') or []:
+        cli_info = self.get_cli_info()
+        if not isinstance(cli_info.get('ClientInfo'), dict):
+            self.fail('Cannot determine Docker client information. Are you maybe using podman instead of docker?')
+        for plugin in cli_info['ClientInfo'].get('Plugins') or []:
             if plugin.get('Name') == component:
                 return plugin
         return None
@@ -263,7 +279,7 @@ class AnsibleDockerClientBase(object):
 class AnsibleModuleDockerClient(AnsibleDockerClientBase):
     def __init__(self, argument_spec=None, supports_check_mode=False, mutually_exclusive=None,
                  required_together=None, required_if=None, required_one_of=None, required_by=None,
-                 min_docker_api_version=None, fail_results=None):
+                 min_docker_api_version=None, fail_results=None, needs_api_version=True):
 
         # Modules can put information in here which will always be returned
         # in case client.fail() is called.
@@ -275,7 +291,7 @@ class AnsibleModuleDockerClient(AnsibleDockerClientBase):
             merged_arg_spec.update(argument_spec)
             self.arg_spec = merged_arg_spec
 
-        mutually_exclusive_params = []
+        mutually_exclusive_params = [('docker_host', 'cli_context')]
         mutually_exclusive_params += DOCKER_MUTUALLY_EXCLUSIVE
         if mutually_exclusive:
             mutually_exclusive_params += mutually_exclusive
@@ -300,7 +316,9 @@ class AnsibleModuleDockerClient(AnsibleDockerClientBase):
         self.diff = self.module._diff
 
         common_args = dict((k, self.module.params[k]) for k in DOCKER_COMMON_ARGS)
-        super(AnsibleModuleDockerClient, self).__init__(common_args, min_docker_api_version=min_docker_api_version)
+        super(AnsibleModuleDockerClient, self).__init__(
+            common_args, min_docker_api_version=min_docker_api_version, needs_api_version=needs_api_version,
+        )
 
     # def call_cli(self, *args, check_rc=False, data=None, cwd=None, environ_update=None):
     def call_cli(self, *args, **kwargs):

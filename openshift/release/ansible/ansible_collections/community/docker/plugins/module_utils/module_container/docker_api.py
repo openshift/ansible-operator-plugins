@@ -44,6 +44,7 @@ from ansible_collections.community.docker.plugins.module_utils.module_container.
     OPTION_DEVICE_READ_IOPS,
     OPTION_DEVICE_WRITE_IOPS,
     OPTION_DEVICE_REQUESTS,
+    OPTION_DEVICE_CGROUP_RULES,
     OPTION_DNS_SERVERS,
     OPTION_DNS_OPTS,
     OPTION_DNS_SEARCH_DOMAINS,
@@ -243,8 +244,8 @@ class DockerAPIEngineDriver(EngineDriver):
     def disconnect_container_from_network(self, client, container_id, network_id):
         client.post_json('/networks/{0}/disconnect', network_id, data={'Container': container_id})
 
-    def connect_container_to_network(self, client, container_id, network_id, parameters=None):
-        parameters = (parameters or {}).copy()
+    def _create_endpoint_config(self, parameters):
+        parameters = parameters.copy()
         params = {}
         for para, dest_para in {
             'ipv4_address': 'IPv4Address',
@@ -267,16 +268,32 @@ class DockerAPIEngineDriver(EngineDriver):
                 ipam_config[param] = params.pop(param)
         if ipam_config:
             params['IPAMConfig'] = ipam_config
+        return params
+
+    def connect_container_to_network(self, client, container_id, network_id, parameters=None):
+        parameters = (parameters or {}).copy()
+        params = self._create_endpoint_config(parameters or {})
         data = {
             'Container': container_id,
             'EndpointConfig': params,
         }
         client.post_json('/networks/{0}/connect', network_id, data=data)
 
-    def create_container(self, client, container_name, create_parameters):
+    def create_container_supports_more_than_one_network(self, client):
+        return client.docker_api_version >= LooseVersion('1.44')
+
+    def create_container(self, client, container_name, create_parameters, networks=None):
         params = {'name': container_name}
         if 'platform' in create_parameters:
             params['platform'] = create_parameters.pop('platform')
+        if networks is not None:
+            create_parameters = create_parameters.copy()
+            create_parameters['NetworkingConfig'] = {
+                'EndpointsConfig': dict(
+                    (network, self._create_endpoint_config(network_params))
+                    for network, network_params in networks.items()
+                )
+            }
         new_container = client.post_json_to_json('/containers/create', data=create_parameters, params=params)
         client.report_warnings(new_container)
         return new_container['Id']
@@ -414,7 +431,7 @@ class DockerAPIEngine(Engine):
         self.set_value = set_value
         self.get_expected_values = get_expected_values or (lambda module, client, api_version, options, image, values, host_info: values)
         self.ignore_mismatching_result = ignore_mismatching_result or \
-            (lambda module, client, api_version, option, image, container_value, expected_value: False)
+            (lambda module, client, api_version, option, image, container_value, expected_value, host_info: False)
         self.preprocess_value = preprocess_value or (lambda module, client, api_version, options, values: values)
         self.update_value = update_value
         self.can_set_value = can_set_value or (lambda api_version: set_value is not None)
@@ -815,7 +832,7 @@ def _preprocess_links(module, client, api_version, value):
     return result
 
 
-def _ignore_mismatching_label_result(module, client, api_version, option, image, container_value, expected_value):
+def _ignore_mismatching_label_result(module, client, api_version, option, image, container_value, expected_value, host_info):
     if option.comparison == 'strict' and module.params['image_label_mismatch'] == 'fail':
         # If there are labels from the base image that should be removed and
         # base_image_mismatch is fail we want raise an error.
@@ -833,10 +850,20 @@ def _ignore_mismatching_label_result(module, client, api_version, option, image,
     return False
 
 
-def _ignore_mismatching_network_result(module, client, api_version, option, image, container_value, expected_value):
+def _needs_host_info_network(values):
+    return values.get('network_mode') == 'default'
+
+
+def _ignore_mismatching_network_result(module, client, api_version, option, image, container_value, expected_value, host_info):
     # 'networks' is handled out-of-band
     if option.name == 'networks':
         return True
+    # The 'default' network_mode value is translated by the Docker daemon to 'bridge' on Linux and 'nat' on Windows.
+    # This happens since Docker 26.1.0 due to https://github.com/moby/moby/pull/47431; before, 'default' was returned.
+    if option.name == 'network_mode' and expected_value == 'default':
+        os_type = host_info.get('OSType') if host_info else None
+        if (container_value, os_type) in (('bridge', 'linux'), ('nat', 'windows')):
+            return True
     return False
 
 
@@ -1290,6 +1317,8 @@ OPTION_DEVICE_WRITE_IOPS.add_engine('docker_api', DockerAPIEngine.host_config_va
 OPTION_DEVICE_REQUESTS.add_engine('docker_api', DockerAPIEngine.host_config_value(
     'DeviceRequests', min_api_version='1.40', preprocess_value=_preprocess_device_requests))
 
+OPTION_DEVICE_CGROUP_RULES.add_engine('docker_api', DockerAPIEngine.host_config_value('DeviceCgroupRules', min_api_version='1.28'))
+
 OPTION_DNS_SERVERS.add_engine('docker_api', DockerAPIEngine.host_config_value('Dns'))
 
 OPTION_DNS_OPTS.add_engine('docker_api', DockerAPIEngine.host_config_value('DnsOptions'))
@@ -1319,7 +1348,7 @@ OPTION_HEALTHCHECK.add_engine('docker_api', DockerAPIEngine.config_value(
 OPTION_HOSTNAME.add_engine('docker_api', DockerAPIEngine.config_value('Hostname'))
 
 OPTION_IMAGE.add_engine('docker_api', DockerAPIEngine.config_value(
-    'Image', ignore_mismatching_result=lambda module, client, api_version, option, image, container_value, expected_value: True))
+    'Image', ignore_mismatching_result=lambda module, client, api_version, option, image, container_value, expected_value, host_info: True))
 
 OPTION_INIT.add_engine('docker_api', DockerAPIEngine.host_config_value('Init'))
 
@@ -1354,6 +1383,7 @@ OPTION_NETWORK.add_engine('docker_api', DockerAPIEngine(
     get_value=_get_values_network,
     set_value=_set_values_network,
     ignore_mismatching_result=_ignore_mismatching_network_result,
+    needs_host_info=_needs_host_info_network,
     extra_option_minimal_versions={
         'networks.mac_address': {
             'docker_api_version': '1.44',

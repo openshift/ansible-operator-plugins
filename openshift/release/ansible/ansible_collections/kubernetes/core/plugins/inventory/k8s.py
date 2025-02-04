@@ -19,6 +19,13 @@ DOCUMENTATION = """
       - Uses the kubectl connection plugin to access the Kubernetes cluster.
       - Uses k8s.(yml|yaml) YAML configuration file to set parameter values.
 
+    deprecated:
+      removed_in: 6.0.0
+      why: |
+        As discussed in U(https://github.com/ansible-collections/kubernetes.core/issues/31), we decided to
+        remove the k8s inventory plugin in release 6.0.0.
+      alternative: "Use M(kubernetes.core.k8s_info) and M(ansible.builtin.add_host) instead."
+
     options:
       plugin:
          description: token that ensures this is a source file for the 'k8s' plugin.
@@ -27,7 +34,7 @@ DOCUMENTATION = """
       connections:
           description:
           - Optional list of cluster connection settings. If no connections are provided, the default
-            '~/.kube/config' and active context will be used, and objects will be returned for all namespaces
+            I(~/.kube/config) and active context will be used, and objects will be returned for all namespaces
             the active user is authorized to access.
           suboptions:
               name:
@@ -38,7 +45,7 @@ DOCUMENTATION = """
                   description:
                   - Path to an existing Kubernetes config file. If not provided, and no other connection
                     options are provided, the Kubernetes client will attempt to load the default
-                    configuration file from '~/.kube/config'. Can also be specified via K8S_AUTH_KUBECONFIG
+                    configuration file from I(~/.kube/config). Can also be specified via K8S_AUTH_KUBECONFIG
                     environment variable.
               context:
                   description:
@@ -86,12 +93,12 @@ DOCUMENTATION = """
                     to access.
 
     requirements:
-    - "python >= 3.6"
-    - "kubernetes >= 12.0.0"
+    - "python >= 3.9"
+    - "kubernetes >= 24.2.0"
     - "PyYAML >= 3.11"
 """
 
-EXAMPLES = """
+EXAMPLES = r"""
 # File must be named k8s.yaml or k8s.yml
 
 - name: Authenticate with token, and return all pods and services for all namespaces
@@ -117,6 +124,7 @@ EXAMPLES = """
 import json
 
 from ansible.errors import AnsibleError
+from ansible.plugins.inventory import BaseInventoryPlugin, Cacheable, Constructable
 from ansible_collections.kubernetes.core.plugins.module_utils.common import (
     HAS_K8S_MODULE_HELPER,
     k8s_import_exception,
@@ -124,7 +132,6 @@ from ansible_collections.kubernetes.core.plugins.module_utils.common import (
 from ansible_collections.kubernetes.core.plugins.module_utils.k8s.client import (
     get_api_client,
 )
-from ansible.plugins.inventory import BaseInventoryPlugin, Constructable, Cacheable
 
 try:
     from kubernetes.dynamic.exceptions import DynamicApiError
@@ -155,6 +162,12 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
 
     def parse(self, inventory, loader, path, cache=True):
         super(InventoryModule, self).parse(inventory, loader, path)
+
+        self.display.deprecated(
+            "The 'k8s' inventory plugin has been deprecated and will be removed in release 6.0.0",
+            version="6.0.0",
+            collection_name="kubernetes.core",
+        )
         cache_key = self._get_cache_prefix(path)
         config_data = self._read_config_data(path)
         self.setup(config_data, cache, cache_key)
@@ -180,7 +193,6 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
             self.fetch_objects(connections)
 
     def fetch_objects(self, connections):
-
         if connections:
             if not isinstance(connections, list):
                 raise K8sInventoryException("Expecting connections to be a list.")

@@ -24,3 +24,5 @@ test_namespace:
   - "helm-local-path-003"
   - "helm-from-repository"
   - "helm-from-url"
+  - "helm-reuse-values"
+  - "helm-chart-with-space-into-name"
