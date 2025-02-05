@@ -12,7 +12,7 @@ DOCUMENTATION = r"""
 ---
 module: helm_plugin_info
 short_description: Gather information about Helm plugins
-version_added: "1.0.0"
+version_added: 1.0.0
 author:
   - Abhijeet Kasurde (@Akasurde)
 requirements:
@@ -71,9 +71,10 @@ rc:
 """
 
 import copy
+
 from ansible_collections.kubernetes.core.plugins.module_utils.helm import (
-    parse_helm_plugin_list,
     AnsibleHelmModule,
+    parse_helm_plugin_list,
 )
 from ansible_collections.kubernetes.core.plugins.module_utils.helm_args_common import (
     HELM_AUTH_ARG_SPEC,
@@ -82,7 +83,6 @@ from ansible_collections.kubernetes.core.plugins.module_utils.helm_args_common i
 
 
 def main():
-
     argument_spec = copy.deepcopy(HELM_AUTH_ARG_SPEC)
     argument_spec.update(
         dict(
