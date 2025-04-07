@@ -29,11 +29,6 @@ RUN dnf clean all && rm -rf /var/cache/dnf/* \
     && pushd /usr/local/bin && ln -sf ../../bin/python3.12 python3 && popd \
     && python3 -m ensurepip --upgrade
 
-# pip install will install a higher version of the requests module. However, pip fails
-# to uninstall the existing request module as it is installed from rpm. Thus, removing
-# the module before using pip install.
-RUN dnf remove -y python3-requests
-
 # Add steps for cachito
 ENV REMOTE_SOURCES=${REMOTE_SOURCES:-"./openshift/"}
 ENV REMOTE_SOURCES_DIR=${REMOTE_SOURCES_DIR:-"/cachito"}

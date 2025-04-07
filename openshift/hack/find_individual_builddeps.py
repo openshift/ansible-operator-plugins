@@ -8,6 +8,12 @@ def process_requirements_file(requirements_file):
     Processes requirements file, and 
     finds build deps for individual packages using 'pip_find_builddeps.py'
     https://raw.githubusercontent.com/containerbuildsystem/cachito/master/bin/pip_find_builddeps.py
+
+    When the build dependencies of the requirements file has conflicts this script can be executed 
+    against the requirements file to get the build dependencies of each python package. 
+    This will help in identifying the python packages with conflicting build dependencies. 
+    The Dockerfile.requirments can then be updated accordingly so that the build requirements 
+    file can be created avoiding the conflicts.
     """
     packages = []
     with open(requirements_file, 'r') as f:
