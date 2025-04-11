@@ -1,4 +1,4 @@
-FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18 AS builder
+FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19 AS builder
 
 ENV GO111MODULE=on \
     GOFLAGS=-mod=vendor
@@ -9,7 +9,7 @@ RUN cd /go/src/github.com/openshift/ansible-operator-plugins \
  && export GIT_VERSION="$(make -pRrq --no-print-directory | grep '^IMAGE_VERSION' | awk -F'= ' '{print $2}')-ocp" \
  && make -e build
 
-FROM registry.ci.openshift.org/ocp/4.18:base-rhel9
+FROM registry.ci.openshift.org/ocp/4.19:base-rhel9
 
 RUN mkdir -p /etc/ansible \
     && echo "localhost ansible_connection=local" > /etc/ansible/hosts \
@@ -28,11 +28,6 @@ RUN dnf clean all && rm -rf /var/cache/dnf/* \
     && dnf install -y catatonit python3.12-cryptography python3.12-devel gcc \
     && pushd /usr/local/bin && ln -sf ../../bin/python3.12 python3 && popd \
     && python3 -m ensurepip --upgrade
-
-# pip install will install a higher version of the requests module. However, pip fails
-# to uninstall the existing request module as it is installed from rpm. Thus, removing
-# the module before using pip install.
-RUN dnf remove -y python3-requests
 
 # Add steps for cachito
 ENV REMOTE_SOURCES=${REMOTE_SOURCES:-"./openshift/"}
