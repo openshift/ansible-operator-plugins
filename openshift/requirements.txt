@@ -6,17 +6,17 @@
 #
 ansible-core==2.18.1
     # via -r ./requirements.in
-#ansible-runner==2.4.0
+ansible-runner==2.4.0
     # via
     #   -r ./requirements.in
     #   ansible-runner-http
-#ansible-runner-http==1.0.0
+ansible-runner-http==1.0.0
     # via -r ./requirements.in
-cachetools==5.5.0
+cachetools==5.5.2
     # via
     #   -r ./requirements.in
     #   google-auth
-certifi==2024.12.14
+certifi==2025.1.31
     # via
     #   -r ./requirements.in
     #   kubernetes
@@ -29,11 +29,11 @@ charset-normalizer==3.4.1
     # via
     #   -r ./requirements.in
     #   requests
-#cryptography==44.0.0
+#cryptography==44.0.2
     # via
     #   -r ./requirements.in
     #   ansible-core
-google-auth==2.37.0
+google-auth==2.38.0
     # via
     #   -r ./requirements.in
     #   kubernetes
@@ -41,7 +41,7 @@ idna==3.10
     # via
     #   -r ./requirements.in
     #   requests
-jinja2==3.1.5
+jinja2==3.1.6
     # via
     #   -r ./requirements.in
     #   ansible-core
@@ -78,7 +78,7 @@ pyasn1==0.6.1
     #   -r ./requirements.in
     #   pyasn1-modules
     #   rsa
-pyasn1-modules==0.4.1
+pyasn1-modules==0.4.2
     # via
     #   -r ./requirements.in
     #   google-auth
@@ -111,7 +111,7 @@ requests-oauthlib==2.0.0
     # via
     #   -r ./requirements.in
     #   kubernetes
-requests-unixsocket==0.3.0
+requests-unixsocket==0.4.1
     # via
     #   -r ./requirements.in
     #   ansible-runner-http
