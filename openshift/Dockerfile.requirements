@@ -6,7 +6,7 @@ RUN set -e && dnf clean all && rm -rf /var/cache/dnf/* \
   && pushd /usr/local/bin && ln -sf ../../bin/python3.12 python3 && popd \
   && python3 -m ensurepip --upgrade
 
-COPY ./Pipfile* ./
+COPY ./images/ansible-operator/Pipfile* ./
 
 # The build dependencies are required by cachito. Following script
 # does exactly the same. More info at: https://github.com/containerbuildsystem/cachito/blob/master/docs/pip.md#build-dependencies
