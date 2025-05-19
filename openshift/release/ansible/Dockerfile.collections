@@ -1,0 +1,29 @@
+FROM registry.ci.openshift.org/ocp/4.19:base-rhel9
+
+RUN set -e && dnf clean all && rm -rf /var/cache/dnf/* \
+  && dnf update -y \
+  && dnf install -y python3.12-devel \
+  && pushd /usr/local/bin && ln -sf ../../bin/python3.12 python3 && popd \
+  && python3 -m ensurepip --upgrade
+
+COPY ./testdata/memcached-molecule-operator/requirements.yml ./
+COPY ./openshift/release/ansible/update-collections.sh ./
+
+# Copy the Pipfile and Pipfile.lock files to install the corresponding
+# version of ansible-core used in the base image. The same version is 
+# installed so that the ansible_collections directory is also updated
+# using the ansible-galaxy of the same version.
+COPY ./images/ansible-operator/Pipfile* ./
+
+RUN python3 -m pip install --upgrade pip
+
+RUN python3 -m pip install pipenv==2023.11.15 \
+    && python3 -m pip install pip-tools \
+    && pipenv install --deploy \
+    # Run the update-collections.sh script in the same virtual environment
+    # where the ansible-core is installed.
+    && pipenv run ./update-collections.sh
+
+VOLUME /tmp/ansible_collections
+
+ENTRYPOINT ["cp", "-r", "./ansible_collections/", "/tmp/ansible_collections/"]

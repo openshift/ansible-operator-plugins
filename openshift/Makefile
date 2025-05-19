@@ -11,6 +11,7 @@ test-e2e-ansible:
 
 CONTAINER_ENGINE ?= docker
 REQUIREMENTS_IMG ?= pip-requirements
+COLLECTIONS_IMG ?= get-collections
 
 .PHONY: build-requirements
 build-requirements:
@@ -27,10 +28,15 @@ generate-requirements: build-requirements
 check-requirements: generate-requirements
 	git diff --exit-code # fast-fail if generate-requirements produced changes
 
+
+.PHONY: build-collections
+build-collections:
+	$(CONTAINER_ENGINE) build -t $(COLLECTIONS_IMG) -f openshift/release/ansible/Dockerfile.collections .
+
 .PHONY: update-collections
-update-collections:
-	cp testdata/memcached-molecule-operator/requirements.yml openshift/release/ansible/requirements.yml
-	./openshift/release/ansible/update-collections.sh
+update-collections: build-collections
+	rm -r ./openshift/release/ansible/ansible_collections
+	$(CONTAINER_ENGINE) run -u $(shell id -u):$(shell id -g) --rm -it -v ./openshift/release/ansible:/tmp/ansible_collections/:Z $(COLLECTIONS_IMG)
 
 .PHONY: check-collections
 check-collections: update-collections
