@@ -1,0 +1,22 @@
+FROM registry.ci.openshift.org/ocp/4.19:base-rhel9
+
+RUN set -e && dnf clean all && rm -rf /var/cache/dnf/* \
+  && dnf update -y \
+  && dnf install -y python3.12-devel \
+  && pushd /usr/local/bin && ln -sf ../../bin/python3.12 python3 && popd \
+  && python3 -m ensurepip --upgrade
+
+COPY ./openshift/release/ansible/requirements.yml ./
+COPY ./openshift/release/ansible/update-collections.sh ./
+COPY ./images/ansible-operator/Pipfile* ./
+
+RUN python3 -m pip install --upgrade pip
+
+RUN python3 -m pip install pipenv==2023.11.15 \
+    && python3 -m pip install pip-tools \
+    && pipenv install --deploy \
+    && pipenv run ./update-collections.sh
+
+VOLUME /tmp/ansible_collections
+
+ENTRYPOINT ["cp", "-r", "./ansible_collections/", "/tmp/ansible_collections/"]
