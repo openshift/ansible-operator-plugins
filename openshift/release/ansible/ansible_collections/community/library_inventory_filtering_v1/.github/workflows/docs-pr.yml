@@ -7,7 +7,7 @@ name: Collection Docs
 concurrency:
   group: docs-pr-${{ github.head_ref }}
   cancel-in-progress: true
-on:
+"on":
   pull_request_target:
     types: [opened, synchronize, reopened, closed]
 
@@ -31,19 +31,29 @@ jobs:
       init-html-short-title: Community.Library_Inventory_Filtering Collection Docs
       init-extra-html-theme-options: |
         documentation_home_url=https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/branch/stable-1/
-      render-file-line: '> * `$<status>` [$<path_tail>](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr/${{ github.event.number }}/$<path_tail>)'
+      render-file-line: >-
+        > * `$<status>` [$<path_tail>](https://${{
+          github.repository_owner
+        }}.github.io/${{
+          github.event.repository.name
+        }}/pr/${{
+          github.event.number
+        }}/$<path_tail>)
 
   publish-docs-gh-pages:
     # for now we won't run this on forks
     if: github.repository == 'ansible-collections/community.library_inventory_filtering'
     permissions:
       contents: write
+      pages: write
+      id-token: write
     needs: [build-docs]
     name: Publish Ansible Docs
     uses: ansible-community/github-docs-build/.github/workflows/_shared-docs-build-publish-gh-pages.yml@main
     with:
       artifact-name: ${{ needs.build-docs.outputs.artifact-name }}
       action: ${{ (github.event.action == 'closed' || needs.build-docs.outputs.changed != 'true') && 'teardown' || 'publish' }}
+      publish-gh-pages-branch: true
     secrets:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
