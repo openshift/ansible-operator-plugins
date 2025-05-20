@@ -18,3 +18,10 @@ communication:
   matrix_rooms:
     - topic: General usage and support questions
       room: '#community:ansible.im'
+  forums:
+    - topic: "Ansible Forum: Discussions about community.library_inventory_filtering_vX"
+      # The following URL directly points to the "inventory-filter-dev" tag
+      url: https://forum.ansible.com/tag/inventory-filter-dev
+    - topic: "Ansible Forum: Discussions on collection development"
+      # The following URL directly points to the "Collection Development" category
+      url: https://forum.ansible.com/c/project/collection-development/27

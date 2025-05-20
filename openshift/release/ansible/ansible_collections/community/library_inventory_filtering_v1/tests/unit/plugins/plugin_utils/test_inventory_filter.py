@@ -2,111 +2,196 @@
 # GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from __future__ import (absolute_import, division, print_function)
+from __future__ import absolute_import, division, print_function
+
+
 __metaclass__ = type
 
 
-import pytest
+import sys
 
+import pytest
 from ansible.errors import AnsibleError, AnsibleParserError
 from ansible.template import Templar
+from ansible_collections.community.internal_test_tools.tests.unit.mock.loader import (
+    DictDataLoader,
+)
+from ansible_collections.community.internal_test_tools.tests.unit.utils.trust import (
+    make_trusted,
+)
 
-from mock import MagicMock
-from ansible_collections.community.internal_test_tools.tests.unit.mock.loader import DictDataLoader
-
-from .....plugins.plugin_utils.inventory_filter import parse_filters, filter_host
+from .....plugins.plugin_utils.inventory_filter import filter_host, parse_filters
 
 
-@pytest.fixture(scope='module')
-def inventory():
+if sys.version_info >= (3, 6):
+    import typing
+
+    if typing.TYPE_CHECKING:
+        from .....plugins.plugin_utils.inventory_filter import (  # pragma: no cover
+            _ExcludeFilter,
+            _IncludeFilter,
+        )
+
+try:
+    from unittest.mock import MagicMock
+except ImportError:
+    from mock import MagicMock
+
+
+@pytest.fixture(name="inventory", scope="module")
+def fixture_inventory():  # (...) -> typing.Any
     r = MagicMock()
     r.templar = Templar(loader=DictDataLoader({}))
     return r
 
 
-@pytest.mark.parametrize('input', [
-    None,
-    [],
-    [{'include': 'foo'}],
-    [{'include': True}],
-    [{'exclude': 'foo'}],
-    [{'exclude': False}],
-])
-def test_parse_success(input):
-    result = parse_filters(input)
+DATA_TEST_PARSE_SUCCESS = [
+    (
+        None,
+        [],
+    ),
+    (
+        [],
+        [],
+    ),
+    (
+        [{"include": "foo"}],
+        [{"include": "foo"}],
+    ),
+    (
+        [{"include": True}],
+        [{"include": True}],
+    ),
+    (
+        [{"exclude": "foo"}],
+        [{"exclude": "foo"}],
+    ),
+    (
+        [{"exclude": False}],
+        [{"exclude": False}],
+    ),
+    (
+        [{"include": None, "exclude": False}],
+        [{"exclude": False}],
+    ),
+]  # type: list[tuple[None | list[dict[str, typing.Any]], list[_IncludeFilter | _ExcludeFilter]]]
+
+
+@pytest.mark.parametrize("filters, output", DATA_TEST_PARSE_SUCCESS)
+def test_parse_success(
+    filters,  # type: None | list[dict[str, typing.Any]]
+    output,  # type: list[_IncludeFilter | _ExcludeFilter]
+):  # type: (...) -> None
+    result = parse_filters(filters)
     print(result)
-    assert result == (input or [])
+    assert result == output
 
 
-@pytest.mark.parametrize('input, output', [
+DATA_TEST_PARSE_ERRORS = [
     (
         [23],
-        ('filter[1] must be a dictionary', ),
+        ("filter[1] must be a dictionary",),
     ),
     (
         [{}],
-        ('filter[1] must have exactly one key-value pair', ),
+        ("filter[1] must have exactly one key-value pair",),
     ),
     (
-        [{'a': 'b', 'c': 'd'}],
-        ('filter[1] must have exactly one key-value pair', ),
+        [{"a": "b", "c": "d"}],
+        ("filter[1] must have exactly one key-value pair",),
     ),
     (
-        [{'foo': 'bar'}],
-        ('filter[1] must have a "include" or "exclude" key, not "foo"', ),
+        [{"include": True, "foo": None}],
+        ("filter[1] must have exactly one key-value pair",),
     ),
     (
-        [{'include': 23}],
+        [{"foo": "bar"}],
+        ('filter[1] must have a "include" or "exclude" key, not "foo"',),
+    ),
+    (
+        [{"include": 23}],
         (
             "filter[1].include must be a string, not <class 'int'>",
             "filter[1].include must be a string, not <type 'int'>",
         ),
     ),
-])
-def test_parse_errors(input, output):
+]  # type: list[tuple[list[typing.Any], tuple[str, ...]]]
+
+
+@pytest.mark.parametrize("filters, output", DATA_TEST_PARSE_ERRORS)
+def test_parse_errors(
+    filters,  # type: list[typing.Any]
+    output,  # tuple[str, ...]
+):  # type: (...) -> None
     with pytest.raises(AnsibleError) as exc:
-        parse_filters(input)
+        parse_filters(filters)
 
     print(exc.value.args[0])
     assert exc.value.args[0] in output
 
 
-@pytest.mark.parametrize('host, host_vars, filters, result', [
+DATA_TEST_FILTER_SUCCESS = [
     (
-        'example.com',
+        "example.com",
         {},
         [],
         True,
     ),
     (
-        'example.com',
-        {'foo': 'bar'},
-        [{'include': 'inventory_hostname == "example.com"'}, {'exclude': 'true'}],
+        "example.com",
+        {"foo": "bar"},
+        [
+            {"include": make_trusted('inventory_hostname == "example.com"')},
+            {"exclude": make_trusted("true")},
+        ],
         True,
     ),
     (
-        'example.com',
+        "example.com",
         {},
-        [{'include': 'inventory_hostname == "foo.com"'}, {'exclude': 'false'}, {'exclude': True}],
+        [
+            {"include": make_trusted('inventory_hostname == "foo.com"')},
+            {"exclude": make_trusted("false")},
+            {"exclude": True},
+        ],
         False,
     ),
-])
-def test_filter_success(inventory, host, host_vars, filters, result):
+]  # type: list[tuple[str, dict[str, typing.Any], list[_IncludeFilter | _ExcludeFilter], bool]]
+
+
+@pytest.mark.parametrize("host, host_vars, filters, result", DATA_TEST_FILTER_SUCCESS)
+def test_filter_success(
+    inventory,
+    host,  # type: str
+    host_vars,  # type: dict[str, typing.Any]
+    filters,  # type: list[_IncludeFilter | _ExcludeFilter]
+    result,  # type: bool
+):  # type: (...) -> None
     assert filter_host(inventory, host, host_vars, filters) == result
 
 
-@pytest.mark.parametrize('host, host_vars, filters, result', [
+DATA_TEST_FILTER_ERRORS = [
     (
-        'example.com',
+        "example.com",
         {},
-        [{'include': 'foobar'}],
+        [{"include": make_trusted("foobar")}],
         (
+            "Could not evaluate filter condition 'foobar' for host example.com: Error while evaluating conditional: 'foobar' is undefined",
             "Could not evaluate filter condition 'foobar' for host example.com: 'foobar' is undefined",
             "Could not evaluate filter condition 'foobar' for host example.com: 'foobar' is undefined. 'foobar' is undefined",
         ),
     ),
-])
-def test_filter_errors(inventory, host, host_vars, filters, result):
+]  # type: list[tuple[str, dict[str, typing.Any], list[_IncludeFilter | _ExcludeFilter], tuple[str, ...]]]
+
+
+@pytest.mark.parametrize("host, host_vars, filters, result", DATA_TEST_FILTER_ERRORS)
+def test_filter_errors(
+    inventory,
+    host,  # type: str
+    host_vars,  # type: dict[str, typing.Any]
+    filters,  # type: list[_IncludeFilter | _ExcludeFilter]
+    result,  # type: tuple[str, ...]
+):  # type: (...) -> None
     with pytest.raises(AnsibleParserError) as exc:
         filter_host(inventory, host, host_vars, filters)
 
