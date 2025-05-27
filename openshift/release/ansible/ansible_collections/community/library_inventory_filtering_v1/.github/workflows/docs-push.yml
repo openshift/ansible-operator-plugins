@@ -7,7 +7,7 @@ name: Collection Docs
 concurrency:
   group: docs-push-${{ github.sha }}
   cancel-in-progress: true
-on:
+"on":
   push:
     branches:
       - stable-*
@@ -42,10 +42,13 @@ jobs:
     if: github.repository == 'ansible-collections/community.library_inventory_filtering'
     permissions:
       contents: write
+      pages: write
+      id-token: write
     needs: [build-docs]
     name: Publish Ansible Docs
     uses: ansible-community/github-docs-build/.github/workflows/_shared-docs-build-publish-gh-pages.yml@main
     with:
       artifact-name: ${{ needs.build-docs.outputs.artifact-name }}
+      publish-gh-pages-branch: true
     secrets:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
