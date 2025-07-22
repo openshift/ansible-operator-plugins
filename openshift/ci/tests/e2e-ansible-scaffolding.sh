@@ -170,6 +170,8 @@ oc project memcached-molecule-operator-system
 echo "running test_operator"
 test_operator
 
+kubectl logs deployment/memcached-molecule-operator-controller-manager -c manager
+
 # clean up the clusterrolebinding for metrics
 kubectl delete clusterrolebinding memcached-molecule-operator-metrics-reader-rolebinding
 

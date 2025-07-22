@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -36,6 +37,38 @@ import (
 )
 
 var log = logf.Log.WithName("runner")
+
+// Common interface for both HTTP and file-based event receivers
+type eventReceiver interface {
+	Events() <-chan eventapi.JobEvent
+	Close()
+}
+
+// httpReceiverWrapper wraps the HTTP-based EventReceiver
+type httpReceiverWrapper struct {
+	receiver *eventapi.EventReceiver
+}
+
+func (w *httpReceiverWrapper) Events() <-chan eventapi.JobEvent {
+	return w.receiver.Events
+}
+
+func (w *httpReceiverWrapper) Close() {
+	w.receiver.Close()
+}
+
+// fileReceiverWrapper wraps the file-based EventReceiver
+type fileReceiverWrapper struct {
+	receiver *eventapi.FileEventReceiver
+}
+
+func (w *fileReceiverWrapper) Events() <-chan eventapi.JobEvent {
+	return w.receiver.Events
+}
+
+func (w *fileReceiverWrapper) Close() {
+	w.receiver.Close()
+}
 
 const (
 	// MaxRunnerArtifactsAnnotation - annotation used by a user to specify the max artifacts to keep
@@ -199,10 +232,36 @@ func (r *runner) Run(ident string, u *unstructured.Unstructured, kubeconfig stri
 	// start the event receiver. We'll check errChan for an error after
 	// ansible-runner exits.
 	errChan := make(chan error, 1)
-	receiver, err := eventapi.New(ident, errChan)
-	if err != nil {
-		return nil, err
+
+	// Check if HTTP event API is disabled via environment variable
+	// useFileAPI := os.Getenv("ANSIBLE_RUNNER_USE_FILE_API") == "true"
+
+	// TODO, making always true
+	useFileAPI := true
+
+	var receiver eventReceiver
+
+	if useFileAPI {
+		// Use file-based event API
+		fmt.Println("Using file-base event API")
+		// File receiver should look in the inputDir where ansible-runner writes artifacts
+		artifactPath := filepath.Join("/tmp/ansible-operator/runner/", r.GVK.Group, r.GVK.Version, r.GVK.Kind,
+			u.GetNamespace(), u.GetName())
+		fileReceiver, err := eventapi.NewFileEventReceiver(ident, artifactPath, errChan)
+		if err != nil {
+			return nil, err
+		}
+		receiver = &fileReceiverWrapper{fileReceiver}
+	} else {
+		// Use existing HTTP-based event API
+		fmt.Println("Using HTTP-based event API")
+		httpReceiver, err := eventapi.New(ident, errChan)
+		if err != nil {
+			return nil, err
+		}
+		receiver = &httpReceiverWrapper{httpReceiver}
 	}
+
 	inputDir := inputdir.InputDir{
 		Path: filepath.Join("/tmp/ansible-operator/runner/", r.GVK.Group, r.GVK.Version, r.GVK.Kind,
 			u.GetNamespace(), u.GetName()),
@@ -211,11 +270,23 @@ func (r *runner) Run(ident string, u *unstructured.Unstructured, kubeconfig stri
 			"K8S_AUTH_KUBECONFIG": kubeconfig,
 			"KUBECONFIG":          kubeconfig,
 		},
-		Settings: map[string]string{
-			"runner_http_url":  receiver.SocketPath,
-			"runner_http_path": receiver.URLPath,
-		},
 		CmdLine: r.ansibleArgs,
+	}
+
+	// Configure Settings based on the API type
+	if useFileAPI {
+		// For file API, configure ansible-runner to write job events to files
+		inputDir.Settings = map[string]string{
+			// "job_event_callback": "minimal", // Enable job event output
+		}
+	} else {
+		// For HTTP API, set the existing HTTP settings
+		if httpWrapper, ok := receiver.(*httpReceiverWrapper); ok {
+			inputDir.Settings = map[string]string{
+				"runner_http_url":  httpWrapper.receiver.SocketPath,
+				"runner_http_path": httpWrapper.receiver.URLPath,
+			}
+		}
 	}
 	// If Path is a dir, assume it is a role path. Otherwise assume it's a
 	// playbook path
@@ -264,11 +335,48 @@ func (r *runner) Run(ident string, u *unstructured.Unstructured, kubeconfig stri
 		dc.Env = append(dc.Env, fmt.Sprintf("K8S_AUTH_KUBECONFIG=%s", kubeconfig),
 			fmt.Sprintf("KUBECONFIG=%s", kubeconfig))
 
+		// // For file-based API, ensure ansible-runner writes event files
+		// if _, isFileReceiver := receiver.(*fileReceiverWrapper); isFileReceiver {
+		// 	dc.Env = append(dc.Env,
+		// 		"ANSIBLE_STDOUT_CALLBACK=minimal", // Ensure events are captured
+		// 		"ANSIBLE_VERBOSITY=1",             // Enable some verbosity
+		// 	)
+		// }
+
 		output, err := dc.CombinedOutput()
 		if err != nil {
 			logger.Error(err, string(output))
 		} else {
 			logger.Info("Ansible-runner exited successfully")
+		}
+
+		// For file-based API, give some time to process final event files
+		if _, isFileReceiver := receiver.(*fileReceiverWrapper); isFileReceiver {
+			logger.V(1).Info("Waiting for file-based event receiver to process final events")
+
+			// Check if artifacts directory exists and list contents
+			artifactsDir := filepath.Join(inputDir.Path, "artifacts", ident)
+			if entries, err := os.ReadDir(artifactsDir); err == nil {
+				logger.V(1).Info("Artifacts directory contents", "dir", artifactsDir, "entries", len(entries))
+				for _, entry := range entries {
+					logger.V(1).Info("Artifact entry", "name", entry.Name(), "isDir", entry.IsDir())
+				}
+			} else {
+				logger.Info("Could not read artifacts directory", "dir", artifactsDir, "error", err)
+			}
+
+			// Check job_events directory specifically
+			jobEventsDir := filepath.Join(inputDir.Path, "artifacts", ident, "job_events")
+			if entries, err := os.ReadDir(jobEventsDir); err == nil {
+				logger.V(1).Info("Job events directory contents", "dir", jobEventsDir, "entries", len(entries))
+				for _, entry := range entries {
+					logger.V(1).Info("Job event file", "name", entry.Name())
+				}
+			} else {
+				logger.Info("Could not read job_events directory", "dir", jobEventsDir, "error", err)
+			}
+
+			time.Sleep(10 * time.Second) // Increased delay for final file processing
 		}
 
 		receiver.Close()
@@ -297,7 +405,7 @@ func (r *runner) Run(ident string, u *unstructured.Unstructured, kubeconfig stri
 	}()
 
 	return &runResult{
-		events:   receiver.Events,
+		events:   receiver.Events(),
 		inputDir: &inputDir,
 		ident:    ident,
 	}, nil

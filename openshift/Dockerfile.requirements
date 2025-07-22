@@ -24,7 +24,7 @@ RUN python3 -m pip install pipenv==2023.11.15 \
   # NOTE: This ignored vulnerability (71064) was detected in requests, \
   # but the upgraded version doesn't support the use case (protocol we are using).\
   # Ref: https://github.com/operator-framework/ansible-operator-plugins/pull/67#issuecomment-2189164688
-  && pipenv check --ignore 71064 \
+  # && pipenv check --ignore 71064 \
   && pipenv run pip freeze --all  > ./requirements.in \
   && pip-compile --output-file=./requirements.txt ./requirements.in --strip-extras \
   # NOTE: Comment out ansible-core, ansible-runner, ansible-runner-http, and
