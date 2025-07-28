@@ -275,12 +275,8 @@ func (r *runner) Run(ident string, u *unstructured.Unstructured, kubeconfig stri
 
 	// Configure Settings based on the API type
 	if useFileAPI {
-		// For file API, configure ansible-runner to write job events to files
-		inputDir.Settings = map[string]string{
-			// "job_event_callback": "minimal", // Enable job event output
-		}
+		inputDir.Settings = map[string]string{}
 	} else {
-		// For HTTP API, set the existing HTTP settings
 		if httpWrapper, ok := receiver.(*httpReceiverWrapper); ok {
 			inputDir.Settings = map[string]string{
 				"runner_http_url":  httpWrapper.receiver.SocketPath,
@@ -335,14 +331,6 @@ func (r *runner) Run(ident string, u *unstructured.Unstructured, kubeconfig stri
 		dc.Env = append(dc.Env, fmt.Sprintf("K8S_AUTH_KUBECONFIG=%s", kubeconfig),
 			fmt.Sprintf("KUBECONFIG=%s", kubeconfig))
 
-		// // For file-based API, ensure ansible-runner writes event files
-		// if _, isFileReceiver := receiver.(*fileReceiverWrapper); isFileReceiver {
-		// 	dc.Env = append(dc.Env,
-		// 		"ANSIBLE_STDOUT_CALLBACK=minimal", // Ensure events are captured
-		// 		"ANSIBLE_VERBOSITY=1",             // Enable some verbosity
-		// 	)
-		// }
-
 		output, err := dc.CombinedOutput()
 		if err != nil {
 			logger.Error(err, string(output))
@@ -376,7 +364,7 @@ func (r *runner) Run(ident string, u *unstructured.Unstructured, kubeconfig stri
 				logger.Info("Could not read job_events directory", "dir", jobEventsDir, "error", err)
 			}
 
-			time.Sleep(10 * time.Second) // Increased delay for final file processing
+			time.Sleep(5 * time.Second) // Increased delay for final file processing
 		}
 
 		receiver.Close()
