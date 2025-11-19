@@ -4,36 +4,3 @@
 #
 #    pip-compile --allow-unsafe --output-file=./requirements-build1.txt --strip-extras ./requirements-build1.in
 #
-#cffi==1.17.1
-    # via -r ./requirements-build1.in
-cython==3.1.2
-    # via -r ./requirements-build1.in
-flit-core==3.12.0
-    # via -r ./requirements-build1.in
-#maturin==1.9.0
-    # via -r ./requirements-build1.in
-packaging==25.0
-    # via
-    #   -r ./requirements-build1.in
-    #   setuptools-scm
-#pycparser==2.22
-    # via
-    #   -r ./requirements-build1.in
-    #   cffi
-semantic-version==2.10.0
-    # via
-    #   -r ./requirements-build1.in
-    #   setuptools-rust
-setuptools-rust==1.11.1
-    # via -r ./requirements-build1.in
-setuptools-scm==8.3.1
-    # via -r ./requirements-build1.in
-wheel==0.45.1
-    # via -r ./requirements-build1.in
-
-# The following packages are considered to be unsafe in a requirements file:
-setuptools==76.0.0
-    # via
-    #   -r ./requirements-build1.in
-    #   setuptools-rust
-    #   setuptools-scm

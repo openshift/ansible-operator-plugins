@@ -4,143 +4,117 @@
 #
 #    pip-compile --output-file=./requirements.txt --strip-extras ./requirements.in
 #
-ansible-core==2.18.5
-    # via -r ./requirements.in
-ansible-runner==2.4.1
-    # via
-    #   -r ./requirements.in
-    #   ansible-runner-http
-ansible-runner-http==1.0.0
-    # via -r ./requirements.in
 cachetools==5.5.2
     # via
-    #   -r ./requirements.in
+    #   -r requirements.in
     #   google-auth
-certifi==2025.1.31
+certifi==2025.8.3
     # via
-    #   -r ./requirements.in
+    #   -r requirements.in
     #   kubernetes
     #   requests
-#cffi==1.17.1
+#cffi==2.0.0
     # via
-    #   -r ./requirements.in
+    #   -r requirements.in
     #   cryptography
-charset-normalizer==3.4.1
+charset-normalizer==3.4.3
     # via
-    #   -r ./requirements.in
+    #   -r requirements.in
     #   requests
-#cryptography==44.0.2
+#cryptography==46.0.1
+    # via -r requirements.in
+durationpy==0.10
     # via
-    #   -r ./requirements.in
-    #   ansible-core
-durationpy==0.9
-    # via
-    #   -r ./requirements.in
+    #   -r requirements.in
     #   kubernetes
-google-auth==2.39.0
+google-auth==2.40.3
     # via
-    #   -r ./requirements.in
+    #   -r requirements.in
     #   kubernetes
 idna==3.10
     # via
-    #   -r ./requirements.in
+    #   -r requirements.in
     #   requests
 jinja2==3.1.6
-    # via
-    #   -r ./requirements.in
-    #   ansible-core
-kubernetes==32.0.0
-    # via -r ./requirements.in
+    # via -r requirements.in
+kubernetes==33.1.0
+    # via -r requirements.in
 lockfile==0.12.2
     # via
-    #   -r ./requirements.in
+    #   -r requirements.in
     #   python-daemon
-markupsafe==3.0.2
+markupsafe==3.0.3
     # via
-    #   -r ./requirements.in
+    #   -r requirements.in
     #   jinja2
-oauthlib==3.2.2
+oauthlib==3.3.1
     # via
-    #   -r ./requirements.in
+    #   -r requirements.in
     #   kubernetes
     #   requests-oauthlib
 packaging==25.0
-    # via
-    #   -r ./requirements.in
-    #   ansible-core
-    #   ansible-runner
+    # via -r requirements.in
 pexpect==4.9.0
-    # via
-    #   -r ./requirements.in
-    #   ansible-runner
+    # via -r requirements.in
 ptyprocess==0.7.0
     # via
-    #   -r ./requirements.in
+    #   -r requirements.in
     #   pexpect
 pyasn1==0.6.1
     # via
-    #   -r ./requirements.in
+    #   -r requirements.in
     #   pyasn1-modules
     #   rsa
 pyasn1-modules==0.4.2
     # via
-    #   -r ./requirements.in
+    #   -r requirements.in
     #   google-auth
-#pycparser==2.22
+#pycparser==2.23
     # via
-    #   -r ./requirements.in
+    #   -r requirements.in
     #   cffi
 python-daemon==3.1.2
-    # via
-    #   -r ./requirements.in
-    #   ansible-runner
+    # via -r requirements.in
 python-dateutil==2.9.0.post0
     # via
-    #   -r ./requirements.in
+    #   -r requirements.in
     #   kubernetes
-pyyaml==6.0.2
+pyyaml==6.0.3
     # via
-    #   -r ./requirements.in
-    #   ansible-core
-    #   ansible-runner
+    #   -r requirements.in
     #   kubernetes
-requests==2.31.0
+requests==2.32.5
     # via
-    #   -r ./requirements.in
-    #   ansible-runner-http
+    #   -r requirements.in
     #   kubernetes
     #   requests-oauthlib
-    #   requests-unixsocket
 requests-oauthlib==2.0.0
     # via
-    #   -r ./requirements.in
+    #   -r requirements.in
     #   kubernetes
-requests-unixsocket==0.4.1
-    # via
-    #   -r ./requirements.in
-    #   ansible-runner-http
 resolvelib==1.0.1
-    # via
-    #   -r ./requirements.in
-    #   ansible-core
+    # via -r requirements.in
 rsa==4.9.1
     # via
-    #   -r ./requirements.in
+    #   -r requirements.in
     #   google-auth
 six==1.17.0
     # via
-    #   -r ./requirements.in
+    #   -r requirements.in
     #   kubernetes
     #   python-dateutil
-urllib3==1.26.20
+urllib3==2.5.0
     # via
-    #   -r ./requirements.in
+    #   -r requirements.in
     #   kubernetes
     #   requests
 websocket-client==1.8.0
     # via
-    #   -r ./requirements.in
+    #   -r requirements.in
     #   kubernetes
 
 # The following packages are considered to be unsafe in a requirements file:
 # pip
+ansible-core==2.18.9
+ansible-runner==2.4.1
+requests-unixsocket==0.4.1
