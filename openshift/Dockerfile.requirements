@@ -70,7 +70,7 @@ RUN python3 -m pip install pipenv==2023.11.15 \
   && sed -i '/ansible-runner-http==/s/^#//g' ./requirements.txt \
   && sed -i '/requests-unixsocket==/s/^#//g' ./requirements.txt \
   && sed -i '/^#kubernetes==/s/^#//g' ./requirements.txt \
-  # Comment out setuptools-scm from requirements-build.in to avoid version conflicts
+  # Comment out setuptools-scm from requirements-build.in to avoid version conflicts during pip-compile
   && sed -i '/setuptools-scm/s/^/#/g' ./requirements-build.in \
   && sed -i '/setuptools_scm/s/^/#/g' ./requirements-build.in \
   && pip-compile --output-file=./requirements-build.txt ./requirements-build.in --strip-extras --allow-unsafe \
@@ -81,13 +81,16 @@ RUN python3 -m pip install pipenv==2023.11.15 \
   && sed -i '/cffi==/s/^/#/g' ./requirements-build.txt \
   && sed -i '/pycparser==/s/^/#/g' ./requirements-build.txt \
   && sed -i '/maturin==/s/^/#/g' ./requirements-build.txt \
-  && sed -i '/setuptools-scm/s/^/#/g' ./requirements-build.txt \
-  && sed -i '/setuptools_scm/s/^/#/g' ./requirements-build.txt \
+  # KEEP setuptools-scm uncommented so Cachito downloads it for CI builds
+  # The version conflict only occurs during pip-compile, not during actual installation
+  # (Commented out the sed commands below - setuptools-scm stays in the file for Cachito)
+  # && sed -i '/setuptools-scm/s/^/#/g' ./requirements-build.txt
+  # && sed -i '/setuptools_scm/s/^/#/g' ./requirements-build.txt
   # Add ansible-core into a separate requirements-build1-temp.in file to include it
   # into the requirements-build1.in file.
   && grep "ansible-core==" ./requirements.in >> ./requirements-build1-temp.in || true \
   && ./pip_find_builddeps.py requirements-build1-temp.in -o requirements-build1.in --append \
-  # Comment out setuptools-scm from requirements-build1.in to avoid version conflicts
+  # Comment out setuptools-scm from requirements-build1.in to avoid version conflicts during pip-compile
   && sed -i '/setuptools-scm/s/^/#/g' ./requirements-build1.in \
   && sed -i '/setuptools_scm/s/^/#/g' ./requirements-build1.in \
   && pip-compile --output-file=./requirements-build1.txt ./requirements-build1.in --strip-extras --allow-unsafe \
@@ -98,8 +101,10 @@ RUN python3 -m pip install pipenv==2023.11.15 \
   && sed -i '/cffi==/s/^/#/g' ./requirements-build1.txt \
   && sed -i '/pycparser==/s/^/#/g' ./requirements-build1.txt \
   && sed -i '/maturin==/s/^/#/g' ./requirements-build1.txt \
-  && sed -i '/setuptools-scm/s/^/#/g' ./requirements-build1.txt \
-  && sed -i '/setuptools_scm/s/^/#/g' ./requirements-build1.txt \
+  # KEEP setuptools-scm uncommented so Cachito downloads it for CI builds
+  # (Commented out the sed commands below - setuptools-scm stays in the file for Cachito)
+  # && sed -i '/setuptools-scm/s/^/#/g' ./requirements-build1.txt
+  # && sed -i '/setuptools_scm/s/^/#/g' ./requirements-build1.txt
   # Add ansible-runner into a separate requirements-pre-build-temp.in
   # file to include it into the requirements-pre-build.in file.
   && grep "ansible-runner==" ./requirements.in >> ./requirements-pre-build-temp.in || true \
@@ -107,13 +112,14 @@ RUN python3 -m pip install pipenv==2023.11.15 \
   # build dependencies of some packages in requirements-build.txt file.
   && grep "flit-core==" ./requirements-build.txt >> ./requirements-pre-build.in || true \
   && ./pip_find_builddeps.py requirements-pre-build-temp.in -o requirements-pre-build.in --append \
-  # Comment out setuptools-scm from requirements-pre-build.in to avoid version conflicts
+  # Comment out setuptools-scm from requirements-pre-build.in to avoid version conflicts during pip-compile
   && sed -i '/setuptools-scm/s/^/#/g' ./requirements-pre-build.in \
   && sed -i '/setuptools_scm/s/^/#/g' ./requirements-pre-build.in \
-  && pip-compile --output-file=./requirements-pre-build.txt ./requirements-pre-build.in --strip-extras --allow-unsafe \
-  # Comment out setuptools-scm from requirements-pre-build.txt
-  && sed -i '/setuptools-scm/s/^/#/g' ./requirements-pre-build.txt \
-  && sed -i '/setuptools_scm/s/^/#/g' ./requirements-pre-build.txt
+  && pip-compile --output-file=./requirements-pre-build.txt ./requirements-pre-build.in --strip-extras --allow-unsafe
+# KEEP setuptools-scm uncommented so Cachito downloads it for CI builds
+# (Commented out the sed commands below - setuptools-scm stays in the file for Cachito)
+# && sed -i '/setuptools-scm/s/^/#/g' ./requirements-pre-build.txt
+# && sed -i '/setuptools_scm/s/^/#/g' ./requirements-pre-build.txt
 
 VOLUME /tmp/requirements
 ENTRYPOINT ["cp", "./requirements.txt", "./requirements-build.txt",  "./requirements-build1.txt", "./requirements-pre-build.txt", "/tmp/requirements/"]
