@@ -26,9 +26,9 @@ RUN python3 -m pip install pipenv==2023.11.15 \
   # Ref: https://github.com/operator-framework/ansible-operator-plugins/pull/67#issuecomment-2189164688
   && pipenv check --ignore 71064 \
   && pipenv run pip freeze --all  > ./requirements.in \
-  # NOTE: Comment out ansible-core, ansible-runner, ansible-runner-http, and
-  # requests-unixsocket from `requirements.in` to avoid dependency conflicts
-  # during pip-compile. These are required to properly resolve dependency conflicts:
+  # NOTE: Comment out ansible-core, ansible-runner, and requests-unixsocket from
+  # `requirements.in` to avoid dependency conflicts during pip-compile.
+  # These are required to properly resolve dependency conflicts:
   #   1. Resolve conflict with `setuptools` version:
   #     - `setuptools>=70.1` is required by ansible-core (via markupsafe).
   #     - `setuptools<=69.0.2,>=45` is required by ansible-runner.
@@ -40,18 +40,15 @@ RUN python3 -m pip install pipenv==2023.11.15 \
   && cp ./requirements.in ./requirements.in.orig \
   && sed -i '/ansible-core==/s/^/#/g' ./requirements.in \
   && sed -i '/ansible-runner==/s/^/#/g' ./requirements.in \
-  && sed -i '/ansible-runner-http==/s/^/#/g' ./requirements.in \
   && sed -i '/requests-unixsocket==/s/^/#/g' ./requirements.in \
   && pip-compile --output-file=./requirements.txt ./requirements.in --strip-extras \
   # Add back the commented packages from the original requirements.in to requirements.txt
   && grep "ansible-core==" ./requirements.in.orig >> ./requirements.txt || true \
   && grep "ansible-runner==" ./requirements.in.orig >> ./requirements.txt || true \
-  && grep "ansible-runner-http==" ./requirements.in.orig >> ./requirements.txt || true \
   && grep "requests-unixsocket==" ./requirements.in.orig >> ./requirements.txt || true \
   # Now comment them out again for pip_find_builddeps.py
   && sed -i '/ansible-core==/s/^/#/g' ./requirements.txt \
   && sed -i '/ansible-runner==/s/^/#/g' ./requirements.txt \
-  && sed -i '/ansible-runner-http==/s/^/#/g' ./requirements.txt \
   && sed -i '/requests-unixsocket==/s/^/#/g' ./requirements.txt \
   # Also comment out kubernetes to avoid setuptools-scm conflicts in build dependencies
   && sed -i '/^kubernetes==/s/^/#/g' ./requirements.txt \
@@ -63,11 +60,10 @@ RUN python3 -m pip install pipenv==2023.11.15 \
   && sed -i '/pycparser==/s/^/#/g' ./requirements.txt \
   && sed -i '/maturin==/s/^/#/g' ./requirements.txt \
   && ./pip_find_builddeps.py requirements.txt -o requirements-build.in --append \
-  # Uncomment ansible-core, ansible-runner, ansible-runner-http, requests-unixsocket, and kubernetes
+  # Uncomment ansible-core, ansible-runner, requests-unixsocket, and kubernetes
   # so they are present in the final requirements.txt file
   && sed -i '/ansible-core==/s/^#//g' ./requirements.txt \
   && sed -i '/ansible-runner==/s/^#//g' ./requirements.txt \
-  && sed -i '/ansible-runner-http==/s/^#//g' ./requirements.txt \
   && sed -i '/requests-unixsocket==/s/^#//g' ./requirements.txt \
   && sed -i '/^#kubernetes==/s/^#//g' ./requirements.txt \
   # Comment out setuptools-scm from requirements-build.in to avoid version conflicts during pip-compile
