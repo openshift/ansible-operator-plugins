@@ -7,7 +7,15 @@ include $(addprefix $(DIR)/vendor/github.com/openshift/build-machinery-go/make/,
 
 .PHONY: test-e2e-ansible
 test-e2e-ansible:
-	./openshift/ci/tests/e2e-ansible-scaffolding.sh
+	@./openshift/ci/tests/e2e-ansible-scaffolding.sh || { \
+		echo ""; \
+		echo "========================================"; \
+		echo "Test failed! Sleeping for 3 hours to allow debugging."; \
+		echo "Press Ctrl+C to skip the sleep and exit."; \
+		echo "========================================"; \
+		sleep 10800 || true; \
+		exit 1; \
+	}
 
 CONTAINER_ENGINE ?= docker
 REQUIREMENTS_IMG ?= pip-requirements
