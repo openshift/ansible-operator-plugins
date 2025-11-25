@@ -160,6 +160,13 @@ kubectl patch clusterrole memcached-molecule-operator-manager-role --type='json'
   }
 ]'
 
+# Patch the deployment to increase memory limit to 1Gi to handle cluster-wide secret watching
+echo "Patching deployment to increase memory limit to 1Gi"
+kubectl patch deployment memcached-molecule-operator-controller-manager \
+  -n memcached-molecule-operator-system \
+  --type='json' \
+  -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/resources/limits/memory", "value": "1Gi"}]'
+
 # create clusterrolebinding for metrics
 kubectl create clusterrolebinding memcached-molecule-operator-metrics-reader-rolebinding --clusterrole=memcached-molecule-operator-metrics-reader --serviceaccount=memcached-molecule-operator-system:default
 
