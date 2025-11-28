@@ -18,7 +18,7 @@ flit-core==3.12.0
     # via -r requirements-build.in
 hatch-vcs==0.5.0
     # via -r requirements-build.in
-hatchling==1.27.0
+hatchling==1.28.0
     # via
     #   -r requirements-build.in
     #   hatch-vcs
@@ -26,7 +26,7 @@ packaging==25.0
     # via
     #   -r requirements-build.in
     #   hatchling
-    #   setuptools-scm
+#    #   setuptools-scm
 pathspec==0.12.1
     # via
     #   -r requirements-build.in
@@ -43,7 +43,7 @@ semver==3.0.4
     # via
     #   -r requirements-build.in
     #   changelog-chug
-setuptools-scm==9.2.2
+#setuptools-scm==9.2.2
     # via hatch-vcs
 trove-classifiers==2025.11.14.15
     # via
@@ -59,4 +59,4 @@ setuptools==80.9.0
     # via
     #   -r requirements-build.in
     #   pbr
-    #   setuptools-scm
+#    #   setuptools-scm
