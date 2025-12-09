@@ -39,6 +39,8 @@ RUN python3 -m pip install pipenv==2023.11.15 \
   && sed -i '/ansible-runner==/s/^/#/g' ./requirements.in \
   && sed -i '/requests-unixsocket==/s/^/#/g' ./requirements.in \
   && pip-compile --output-file=./requirements.txt ./requirements.in --strip-extras \
+  # Pin python-dateutil to 2.9.0 instead of 2.9.0.post0
+  && sed -i 's/python-dateutil==2.9.0.post0/python-dateutil==2.9.0/g' ./requirements.txt \
   # Add back the commented packages from the original requirements.in to requirements.txt
   && grep "ansible-core==" ./requirements.in.orig >> ./requirements.txt || true \
   && grep "ansible-runner==" ./requirements.in.orig >> ./requirements.txt || true \
@@ -76,7 +78,7 @@ RUN python3 -m pip install pipenv==2023.11.15 \
   && sed -i '/maturin==/s/^/#/g' ./requirements-build.txt \
   # Add ansible-core into a separate requirements-build1-temp.in file to include it
   # into the requirements-build1.in file.
-  && grep "ansible-core==" ./requirements.in >> ./requirements-build1-temp.in || true \
+  && grep "urllib3==" ./requirements.in >> ./requirements-build1-temp.in || true \
   && ./pip_find_builddeps.py requirements-build1-temp.in -o requirements-build1.in --append \
   && pip-compile --output-file=./requirements-build1.txt ./requirements-build1.in --strip-extras --allow-unsafe \
   # NOTE: Comment out cryptography and its dependencies from the requirements-build1.txt
@@ -88,7 +90,7 @@ RUN python3 -m pip install pipenv==2023.11.15 \
   && sed -i '/maturin==/s/^/#/g' ./requirements-build1.txt \
   # Add ansible-runner into a separate requirements-pre-build-temp.in
   # file to include it into the requirements-pre-build.in file.
-  && grep "ansible-runner==" ./requirements.in >> ./requirements-pre-build-temp.in || true \
+  && grep "ansible-runner==" ./requirements.txt >> ./requirements-pre-build-temp.in || true \
   # Add flit-core to requirements-pre-build.in file as this package is part of the
   # build dependencies of some packages in requirements-build.txt file.
   && grep "flit-core==" ./requirements-build.txt >> ./requirements-pre-build.in || true \
