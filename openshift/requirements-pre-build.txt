@@ -4,5 +4,34 @@
 #
 #    pip-compile --allow-unsafe --output-file=./requirements-pre-build.txt --strip-extras ./requirements-pre-build.in
 #
+changelog-chug==0.0.3
+    # via -r requirements-pre-build.in
+cython==3.2.2
+    # via -r requirements-pre-build.in
+docutils==0.22.3
+    # via
+    #   -r requirements-pre-build.in
+    #   changelog-chug
 flit-core==3.12.0
     # via -r requirements-pre-build.in
+packaging==25.0
+    # via
+    #   -r requirements-pre-build.in
+    #   setuptools-scm
+pbr==7.0.3
+    # via -r requirements-pre-build.in
+semver==3.0.4
+    # via
+    #   -r requirements-pre-build.in
+    #   changelog-chug
+setuptools-scm==8.1.0
+    # via -r requirements-pre-build.in
+wheel==0.45.1
+    # via -r requirements-pre-build.in
+
+# The following packages are considered to be unsafe in a requirements file:
+setuptools==70.0.0
+    # via
+    #   -r requirements-pre-build.in
+    #   pbr
+    #   setuptools-scm
