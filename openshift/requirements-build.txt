@@ -6,8 +6,6 @@
 #
 calver==2025.10.20
     # via -r requirements-build.in
-#cffi==2.0.0
-    # via -r requirements-build.in
 changelog-chug==0.0.3
     # via -r requirements-build.in
 cython==3.2.4
@@ -24,8 +22,6 @@ hatchling==1.29.0
     # via
     #   -r requirements-build.in
     #   hatch-vcs
-#maturin==1.12.6
-    # via -r requirements-build.in
 packaging==26.0
     # via
     #   -r requirements-build.in
@@ -44,20 +40,10 @@ pluggy==1.6.0
     #   hatchling
 poetry-core==2.3.1
     # via -r requirements-build.in
-#pycparser==3.0
-    # via
-    #   -r requirements-build.in
-    #   cffi
-semantic-version==2.10.0
-    # via
-    #   -r requirements-build.in
-    #   setuptools-rust
 semver==3.0.4
     # via
     #   -r requirements-build.in
     #   changelog-chug
-setuptools-rust==1.12.0
-    # via -r requirements-build.in
 setuptools-scm==9.2.2
     # via hatch-vcs
 trove-classifiers==2026.1.14.14
@@ -72,5 +58,4 @@ setuptools==81.0.0
     # via
     #   -r requirements-build.in
     #   pbr
-    #   setuptools-rust
     #   setuptools-scm

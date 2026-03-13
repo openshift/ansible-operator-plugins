@@ -51,6 +51,9 @@ RUN python3 -m pip install pipenv==2023.11.15 \
   && sed -i '/requests-unixsocket==/s/^/#/g' ./requirements.txt \
   # Also comment out kubernetes to avoid setuptools-scm conflicts in build dependencies
   && sed -i '/^kubernetes==/s/^/#/g' ./requirements.txt \
+  # Comment out google-auth to prevent pip from pulling in cryptography (and its
+  # Rust/maturin build chain) as a transitive dependency during pip download
+  && sed -i '/^google-auth==/s/^/#/g' ./requirements.txt \
   # NOTE: Comment out cryptography and its dependencies from the requirements.txt
   # files as these packages can't be installed in the isolated environment of OSBS
   # image build. These packages will be installed through rpms.
@@ -65,6 +68,7 @@ RUN python3 -m pip install pipenv==2023.11.15 \
   && sed -i '/ansible-runner==/s/^#//g' ./requirements.txt \
   && sed -i '/requests-unixsocket==/s/^#//g' ./requirements.txt \
   && sed -i '/^#kubernetes==/s/^#//g' ./requirements.txt \
+  && sed -i '/^#google-auth==/s/^#//g' ./requirements.txt \
   # Comment out setuptools-scm from requirements-build.in to avoid version conflicts during pip-compile
   && sed -i '/setuptools-scm/s/^/#/g' ./requirements-build.in \
   && sed -i '/setuptools_scm/s/^/#/g' ./requirements-build.in \
