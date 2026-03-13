@@ -4,11 +4,7 @@
 #
 #    pip-compile --output-file=./requirements.txt --strip-extras ./requirements.in
 #
-cachetools==5.5.2
-    # via
-    #   -r requirements.in
-    #   google-auth
-certifi==2025.8.3
+certifi==2026.2.25
     # via
     #   -r requirements.in
     #   kubernetes
@@ -17,21 +13,23 @@ certifi==2025.8.3
     # via
     #   -r requirements.in
     #   cryptography
-charset-normalizer==3.4.3
+charset-normalizer==3.4.4
     # via
     #   -r requirements.in
     #   requests
-#cryptography==46.0.1
-    # via -r requirements.in
+#cryptography==46.0.5
+    # via
+    #   -r requirements.in
+    #   google-auth
 durationpy==0.10
     # via
     #   -r requirements.in
     #   kubernetes
-google-auth==2.40.3
+google-auth==2.48.0
     # via
     #   -r requirements.in
     #   kubernetes
-idna==3.10
+idna==3.11
     # via
     #   -r requirements.in
     #   requests
@@ -52,7 +50,7 @@ oauthlib==3.3.1
     #   -r requirements.in
     #   kubernetes
     #   requests-oauthlib
-packaging==25.0
+packaging==26.0
     # via -r requirements.in
 pexpect==4.9.0
     # via -r requirements.in
@@ -60,7 +58,7 @@ ptyprocess==0.7.0
     # via
     #   -r requirements.in
     #   pexpect
-pyasn1==0.6.1
+pyasn1==0.6.2
     # via
     #   -r requirements.in
     #   pyasn1-modules
@@ -69,7 +67,7 @@ pyasn1-modules==0.4.2
     # via
     #   -r requirements.in
     #   google-auth
-#pycparser==2.23
+#pycparser==3.0
     # via
     #   -r requirements.in
     #   cffi
@@ -103,18 +101,18 @@ six==1.17.0
     #   -r requirements.in
     #   kubernetes
     #   python-dateutil
-urllib3==2.5.0
+urllib3==2.6.3
     # via
     #   -r requirements.in
     #   kubernetes
     #   requests
-websocket-client==1.8.0
+websocket-client==1.9.0
     # via
     #   -r requirements.in
     #   kubernetes
 
 # The following packages are considered to be unsafe in a requirements file:
 # pip
-ansible-core==2.18.9
-ansible-runner==2.4.1
+ansible-core==2.18.14
+ansible-runner==2.4.2
 requests-unixsocket==0.4.1

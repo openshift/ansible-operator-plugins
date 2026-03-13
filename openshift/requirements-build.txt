@@ -6,11 +6,13 @@
 #
 calver==2025.10.20
     # via -r requirements-build.in
+#cffi==2.0.0
+    # via -r requirements-build.in
 changelog-chug==0.0.3
     # via -r requirements-build.in
-cython==3.2.2
+cython==3.2.4
     # via -r requirements-build.in
-docutils==0.22.3
+docutils==0.22.4
     # via
     #   -r requirements-build.in
     #   changelog-chug
@@ -18,16 +20,19 @@ flit-core==3.12.0
     # via -r requirements-build.in
 hatch-vcs==0.5.0
     # via -r requirements-build.in
-hatchling==1.28.0
+hatchling==1.29.0
     # via
     #   -r requirements-build.in
     #   hatch-vcs
-packaging==25.0
+#maturin==1.12.6
+    # via -r requirements-build.in
+packaging==26.0
     # via
     #   -r requirements-build.in
     #   hatchling
     #   setuptools-scm
-pathspec==0.12.1
+    #   wheel
+pathspec==1.0.4
     # via
     #   -r requirements-build.in
     #   hatchling
@@ -37,24 +42,35 @@ pluggy==1.6.0
     # via
     #   -r requirements-build.in
     #   hatchling
-poetry-core==2.2.1
+poetry-core==2.3.1
     # via -r requirements-build.in
+#pycparser==3.0
+    # via
+    #   -r requirements-build.in
+    #   cffi
+semantic-version==2.10.0
+    # via
+    #   -r requirements-build.in
+    #   setuptools-rust
 semver==3.0.4
     # via
     #   -r requirements-build.in
     #   changelog-chug
+setuptools-rust==1.12.0
+    # via -r requirements-build.in
 setuptools-scm==9.2.2
     # via hatch-vcs
-trove-classifiers==2025.12.1.14
+trove-classifiers==2026.1.14.14
     # via
     #   -r requirements-build.in
     #   hatchling
-wheel==0.45.1
+wheel==0.46.3
     # via -r requirements-build.in
 
 # The following packages are considered to be unsafe in a requirements file:
-setuptools==80.9.0
+setuptools==81.0.0
     # via
     #   -r requirements-build.in
     #   pbr
+    #   setuptools-rust
     #   setuptools-scm
