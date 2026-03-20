@@ -9,11 +9,23 @@ from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
 
+import sys
+
 from ansible.errors import AnsibleError, AnsibleParserError
-from ansible.module_utils.common._collections_compat import Mapping
 from ansible.module_utils.common.text.converters import to_native
 from ansible.module_utils.parsing.convert_bool import boolean
-from ansible.module_utils.six import string_types
+
+
+if sys.version_info[0] == 2:
+    string_types = (basestring,)  # noqa: F821, pylint: disable=undefined-variable
+else:
+    string_types = (str,)
+
+try:
+    from collections.abc import Mapping
+except ImportError:
+    # Python 2.x
+    from collections import Mapping  # pylint: disable=deprecated-class
 
 
 _ALLOWED_KEYS = ("include", "exclude")

@@ -1,2 +1,4 @@
 noxfile.py future-import-boilerplate
 noxfile.py metaclass-boilerplate
+plugins/plugin_utils/inventory_filter.py pylint:bad-option-value
+plugins/plugin_utils/inventory_filter.py pylint:ansible-bad-import-from
