@@ -49,6 +49,9 @@ RUN python3 -m pip install pipenv==2023.11.15 \
   && sed -i '/requests-unixsocket==/s/^/#/g' ./requirements.txt \
   # Also comment out kubernetes to avoid setuptools-scm conflicts in build dependencies
   && sed -i '/^kubernetes==/s/^/#/g' ./requirements.txt \
+  # Comment out google-auth to prevent pip from pulling in cryptography (and its
+  # Rust/maturin build chain) as a transitive dependency during pip download
+  && sed -i '/^google-auth==/s/^/#/g' ./requirements.txt \
   # NOTE: Comment out cryptography and its dependencies from the requirements.txt
   # files as these packages can't be installed in the isolated environment of OSBS
   # image build. These packages will be installed through rpms.
@@ -63,6 +66,7 @@ RUN python3 -m pip install pipenv==2023.11.15 \
   && sed -i '/ansible-runner==/s/^#//g' ./requirements.txt \
   && sed -i '/requests-unixsocket==/s/^#//g' ./requirements.txt \
   && sed -i '/^#kubernetes==/s/^#//g' ./requirements.txt \
+  && sed -i '/^#google-auth==/s/^#//g' ./requirements.txt \
   # Comment out setuptools-scm from requirements-build.in to avoid version conflicts during pip-compile
   && sed -i '/setuptools-scm/s/^/#/g' ./requirements-build.in \
   && sed -i '/setuptools_scm/s/^/#/g' ./requirements-build.in \
@@ -74,9 +78,9 @@ RUN python3 -m pip install pipenv==2023.11.15 \
   && sed -i '/cffi==/s/^/#/g' ./requirements-build.txt \
   && sed -i '/pycparser==/s/^/#/g' ./requirements-build.txt \
   && sed -i '/maturin==/s/^/#/g' ./requirements-build.txt \
-  # Add ansible-core into a separate requirements-build1-temp.in file to include it
+  # Add urllib3 into a separate requirements-build1-temp.in file to include it
   # into the requirements-build1.in file.
-  && grep "ansible-core==" ./requirements.in >> ./requirements-build1-temp.in || true \
+  && grep "urllib3==" ./requirements.in >> ./requirements-build1-temp.in || true \
   && ./pip_find_builddeps.py requirements-build1-temp.in -o requirements-build1.in --append \
   && pip-compile --output-file=./requirements-build1.txt ./requirements-build1.in --strip-extras --allow-unsafe \
   # NOTE: Comment out cryptography and its dependencies from the requirements-build1.txt
@@ -88,12 +92,16 @@ RUN python3 -m pip install pipenv==2023.11.15 \
   && sed -i '/maturin==/s/^/#/g' ./requirements-build1.txt \
   # Add ansible-runner into a separate requirements-pre-build-temp.in
   # file to include it into the requirements-pre-build.in file.
-  && grep "ansible-runner==" ./requirements.in >> ./requirements-pre-build-temp.in || true \
+  && grep "ansible-runner==" ./requirements.txt >> ./requirements-pre-build-temp.in || true \
   # Add flit-core to requirements-pre-build.in file as this package is part of the
   # build dependencies of some packages in requirements-build.txt file.
   && grep "flit-core==" ./requirements-build.txt >> ./requirements-pre-build.in || true \
   && ./pip_find_builddeps.py requirements-pre-build-temp.in -o requirements-pre-build.in --append \
-  && pip-compile --output-file=./requirements-pre-build.txt ./requirements-pre-build.in --strip-extras --allow-unsafe
+  && pip-compile --output-file=./requirements-pre-build.txt ./requirements-pre-build.in --strip-extras --allow-unsafe \
+  # Pin wheel to 0.45.1 in pre-build so cachi2 fetches it for ansible-core's
+  # build isolation (which requires exactly wheel==0.45.1).
+  # requirements-build.txt still has wheel==0.46.3 which upgrades it later.
+  && sed -i 's/^wheel==.*/wheel==0.45.1/' ./requirements-pre-build.txt
 
 VOLUME /tmp/requirements
 ENTRYPOINT ["cp", "./requirements.txt", "./requirements-build.txt",  "./requirements-build1.txt", "./requirements-pre-build.txt", "/tmp/requirements/"]
