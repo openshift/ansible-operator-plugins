@@ -66,6 +66,8 @@ metadata:
 EOF
 
     # get the serviceaccount token to access the metrics
+    # Temporarily disable command echoing to avoid exposing the token in logs
+    set +x
     token=$(kubectl get secret service-account-secret -o jsonpath={.data.token} | base64 -d)
 
 
@@ -73,10 +75,14 @@ EOF
     if ! timeout 1m bash -c -- "until kubectl run --attach --rm --restart=Never test-metrics --image=registry.access.redhat.com/ubi8/ubi-minimal:latest -n memcached-molecule-operator-system --overrides='{\"spec\":{\"securityContext\":{\"runAsNonRoot\": true, \"capabilities\": {\"drop\": [\"ALL\"]}, \"allowPrivelegeEscalation\": false, \"seccompProfile\": {\"type\": \"RuntimeDefault\"}}}}' -- curl -sfkH \"Authorization: Bearer ${token}\" https://memcached-molecule-operator-controller-manager-metrics-service:8443/metrics; do sleep 1; done";
     then
         echo "Failed to verify that metrics endpoint exists"
+        # Re-enable command echoing for debugging output
+        set -x
         kubectl describe pods
         kubectl logs deployment/memcached-molecule-operator-controller-manager -c manager
         exit 1
     fi
+    # Re-enable command echoing after sensitive operations
+    set -x
 
     # create CR; this will trigger the reconcile and deploy memcached operand
     kubectl apply -f config/samples/cache_v1alpha1_memcached.yaml
@@ -137,9 +143,38 @@ EOF
     fi
 }
 
-# use sample in testdata
-pushd $ROOTDIR/testdata/memcached-molecule-operator
+echo "Creating temporary copy of test operator to avoid modifying synced upstream files"
+TESTDIR="$(mktemp -d)"
+trap_add "rm -rf $TESTDIR" EXIT
+cp -r $ROOTDIR/testdata/memcached-molecule-operator $TESTDIR/
+pushd $TESTDIR/memcached-molecule-operator
 ls
+
+# Pre-configure deployment memory limit to avoid pod restart after deployment
+# This prevents leader election conflicts that would occur during rolling updates
+echo "Configuring deployment memory limit to 1Gi for cluster-wide secret watching"
+cat <<EOF > config/manager/memory_patch.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller-manager
+  namespace: system
+spec:
+  template:
+    spec:
+      containers:
+      - name: manager
+        resources:
+          limits:
+            memory: 1Gi
+EOF
+
+# Add the memory patch to kustomization.yaml
+cat <<EOF >> config/manager/kustomization.yaml
+
+patches:
+- path: memory_patch.yaml
+EOF
 
 # deploy operator
 echo "running make deploy"
