@@ -12,9 +12,15 @@ else
     cd  ${REMOTE_SOURCES_DIR}
 fi
 
+python3 -m pip install --upgrade pip
+
 # Install the packages in order of build dependency to avoid issues during installation.
 python3 -m pip install ${PIP_OPTS} -r requirements-pre-build.txt
+python3 -m pip install ${PIP_OPTS} -r requirements-build1.txt
 python3 -m pip install ${PIP_OPTS} -r requirements-build.txt
 python3 -m pip install ${PIP_OPTS} -r requirements.txt
+
+# Install the local ansible-runner-http package
+python3 -m pip install ${PIP_OPTS} /ansible_runner_http/
 
 rm -rf ${REMOTE_SOURCES_DIR}
