@@ -99,7 +99,15 @@ RUN python3 -m pip install pipenv==2023.11.15 \
   # Pin wheel to 0.45.1 in pre-build so cachi2 fetches it for ansible-core's
   # build isolation (which requires exactly wheel==0.45.1).
   # requirements-build.txt still has wheel==0.46.3 which upgrades it later.
-  && sed -i 's/^wheel==.*/wheel==0.45.1/' ./requirements-pre-build.txt
+  && sed -i 's/^wheel==.*/wheel==0.45.1/' ./requirements-pre-build.txt \
+  # Pin setuptools to 75.3.0 in pre-build so cachi2 fetches it for
+  # ansible-runner's build isolation (which requires setuptools<=75.3.0).
+  # requirements-build.txt still has setuptools==82.0.0 which upgrades it later.
+  && sed -i 's/^setuptools==.*/setuptools==75.3.0/' ./requirements-pre-build.txt \
+  # Pin setuptools-scm to 7.1.0 in pre-build so cachi2 fetches it for
+  # kubernetes's build isolation (which requires setuptools_scm<8.0).
+  # requirements-build.txt still has setuptools-scm==9.2.2 which upgrades it later.
+  && sed -i 's/^setuptools-scm==.*/setuptools-scm==7.1.0/' ./requirements-pre-build.txt
 
 VOLUME /tmp/requirements
 ENTRYPOINT ["cp", "./requirements.txt", "./requirements-build.txt", "./requirements-build1.txt", "./requirements-pre-build.txt", "/tmp/requirements/"]
