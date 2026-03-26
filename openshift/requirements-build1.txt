@@ -27,7 +27,7 @@ setuptools-scm==9.2.2
     # via
     #   -r requirements-build1.in
     #   hatch-vcs
-tomli==2.4.0
+tomli==2.4.1
     # via
     #   -r requirements-build1.in
     #   hatchling
