@@ -29,7 +29,7 @@ semver==3.0.4
     #   changelog-chug
 setuptools-scm==7.1.0
     # via -r requirements-pre-build.in
-tomli==2.4.0
+tomli==2.4.1
     # via
     #   -r requirements-pre-build.in
     #   setuptools-scm

@@ -40,6 +40,8 @@ pluggy==1.6.0
     # via
     #   -r requirements-build.in
     #   hatchling
+poetry-core==2.2.1
+    # via -r requirements-build.in
 semver==3.0.4
     # via
     #   -r requirements-build.in
