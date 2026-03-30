@@ -14,6 +14,7 @@ class ModuleDocFragment(object):
 
     # Docker doc fragment
     DOCUMENTATION = r"""
+---
 options:
   filters:
     description:

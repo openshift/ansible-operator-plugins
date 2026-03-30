@@ -39,7 +39,8 @@ except ImportError:
 
 
 @pytest.fixture(name="inventory", scope="module")
-def fixture_inventory():  # (...) -> typing.Any
+def fixture_inventory():
+    # type: () -> typing.Any
     r = MagicMock()
     r.templar = Templar(loader=DictDataLoader({}))
     return r
@@ -121,8 +122,9 @@ DATA_TEST_PARSE_ERRORS = [
 @pytest.mark.parametrize("filters, output", DATA_TEST_PARSE_ERRORS)
 def test_parse_errors(
     filters,  # type: list[typing.Any]
-    output,  # tuple[str, ...]
-):  # type: (...) -> None
+    output,  # type: tuple[str, ...]
+):
+    # type: (...) -> None
     with pytest.raises(AnsibleError) as exc:
         parse_filters(filters)
 
@@ -161,7 +163,7 @@ DATA_TEST_FILTER_SUCCESS = [
 
 @pytest.mark.parametrize("host, host_vars, filters, result", DATA_TEST_FILTER_SUCCESS)
 def test_filter_success(
-    inventory,
+    inventory,  # type: typing.Any
     host,  # type: str
     host_vars,  # type: dict[str, typing.Any]
     filters,  # type: list[_IncludeFilter | _ExcludeFilter]
@@ -186,7 +188,7 @@ DATA_TEST_FILTER_ERRORS = [
 
 @pytest.mark.parametrize("host, host_vars, filters, result", DATA_TEST_FILTER_ERRORS)
 def test_filter_errors(
-    inventory,
+    inventory,  # type: typing.Any
     host,  # type: str
     host_vars,  # type: dict[str, typing.Any]
     filters,  # type: list[_IncludeFilter | _ExcludeFilter]

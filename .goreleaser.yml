@@ -32,6 +32,7 @@ dockers:
   extra_files:
     - "images/ansible-operator/Pipfile"
     - "images/ansible-operator/Pipfile.lock"
+    - "images/ansible-operator/ansible_runner_http"
 - image_templates:
     - "{{ .Env.IMAGE_REPO }}:{{ .Env.IMAGE_TAG }}-arm64"
   dockerfile: images/ansible-operator/Dockerfile
@@ -46,6 +47,7 @@ dockers:
   extra_files:
     - "images/ansible-operator/Pipfile"
     - "images/ansible-operator/Pipfile.lock"
+    - "images/ansible-operator/ansible_runner_http"
 - image_templates:
     - "{{ .Env.IMAGE_REPO }}:{{ .Env.IMAGE_TAG }}-ppc64le"
   dockerfile: images/ansible-operator/Dockerfile
@@ -60,6 +62,7 @@ dockers:
   extra_files:
     - "images/ansible-operator/Pipfile"
     - "images/ansible-operator/Pipfile.lock"
+    - "images/ansible-operator/ansible_runner_http"
 - image_templates:
     - "{{ .Env.IMAGE_REPO }}:{{ .Env.IMAGE_TAG }}-s390x"
   dockerfile: images/ansible-operator/Dockerfile
@@ -74,6 +77,7 @@ dockers:
   extra_files:
     - "images/ansible-operator/Pipfile"
     - "images/ansible-operator/Pipfile.lock"
+    - "images/ansible-operator/ansible_runner_http"
 docker_manifests:
 - name_template: "{{ .Env.IMAGE_REPO }}:{{ .Env.IMAGE_TAG }}"
   image_templates:

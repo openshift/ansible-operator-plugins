@@ -49,3 +49,41 @@ releases:
     fragments:
       - 1.1.1.yml
     release_date: '2025-04-21'
+  1.1.2:
+    changes:
+      bugfixes:
+        - Avoid deprecated functionality in ansible-core 2.20 (https://github.com/ansible-collections/community.library_inventory_filtering/pull/38).
+      release_summary: Maintenance release.
+    fragments:
+      - 1.1.2.yml
+      - 38-deprecations.yml
+    release_date: '2025-10-01'
+  1.1.3:
+    changes:
+      bugfixes:
+        - Stop using ``ansible.module_utils.six`` to avoid user-facing deprecation
+          messages with ansible-core 2.20, while still supporting older ansible-core
+          versions (https://github.com/ansible-collections/community.library_inventory_filtering/pull/39).
+      release_summary: Maintenance release.
+    fragments:
+      - 1.1.3.yml
+      - 39-six.yml
+    release_date: '2025-10-03'
+  1.1.4:
+    changes:
+      bugfixes:
+        - Fix accidental type extensions (https://github.com/ansible-collections/community.library_inventory_filtering/pull/40).
+      release_summary: Maintenance release.
+    fragments:
+      - 1.1.4.yml
+      - 40-fix.yml
+    release_date: '2025-10-05'
+  1.1.5:
+    changes:
+      bugfixes:
+        - Improve and stricten typing information (https://github.com/ansible-collections/community.library_inventory_filtering/pull/42).
+      release_summary: Maintenance release.
+    fragments:
+      - 1.1.5.yml
+      - 42-typing.yml
+    release_date: '2025-10-25'

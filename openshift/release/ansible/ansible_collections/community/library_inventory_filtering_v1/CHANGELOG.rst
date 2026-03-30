@@ -4,6 +4,58 @@ Community Inventory Filtering Library Collection Release Notes
 
 .. contents:: Topics
 
+v1.1.5
+======
+
+Release Summary
+---------------
+
+Maintenance release.
+
+Bugfixes
+--------
+
+- Improve and stricten typing information (https://github.com/ansible-collections/community.library_inventory_filtering/pull/42).
+
+v1.1.4
+======
+
+Release Summary
+---------------
+
+Maintenance release.
+
+Bugfixes
+--------
+
+- Fix accidental type extensions (https://github.com/ansible-collections/community.library_inventory_filtering/pull/40).
+
+v1.1.3
+======
+
+Release Summary
+---------------
+
+Maintenance release.
+
+Bugfixes
+--------
+
+- Stop using ``ansible.module_utils.six`` to avoid user-facing deprecation messages with ansible-core 2.20, while still supporting older ansible-core versions (https://github.com/ansible-collections/community.library_inventory_filtering/pull/39).
+
+v1.1.2
+======
+
+Release Summary
+---------------
+
+Maintenance release.
+
+Bugfixes
+--------
+
+- Avoid deprecated functionality in ansible-core 2.20 (https://github.com/ansible-collections/community.library_inventory_filtering/pull/38).
+
 v1.1.1
 ======
 

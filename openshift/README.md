@@ -19,6 +19,8 @@ The downstream artifacts are as follows:
 * `vendor` - unlike the upstream, we vendor in the dependencies downstream.
 * `openshift/vendor` - vendor in the dependencies from openshift/go.mod.
 
+In addition, the downstream repo backports the Install ansible_runner_http as local package from v1.41
+
 # Syncing
 
 When an upstream release is ready, you can sync down that release downstream.
