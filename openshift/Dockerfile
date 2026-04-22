@@ -28,6 +28,7 @@ RUN dnf clean all && rm -rf /var/cache/dnf/* \
     && dnf install -y catatonit python3.12-cryptography python3.12-devel gcc \
     && pushd /usr/local/bin && ln -sf ../../bin/python3.12 python3 && popd \
     && python3 -m ensurepip --upgrade \
+    # python3-six conflicts with pip-installed packages on RHEl/CentOS 10; remove it if present
     && { dnf remove -y python3-six || true; }
 
 # Add steps for cachito
