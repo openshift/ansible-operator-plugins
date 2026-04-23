@@ -36,6 +36,8 @@ RUN yum remove -y python3-requests
 ENV REMOTE_SOURCES=${REMOTE_SOURCES:-"./openshift/"}
 ENV REMOTE_SOURCES_DIR=${REMOTE_SOURCES_DIR:-"/cachito"}
 COPY ${REMOTE_SOURCES} ${REMOTE_SOURCES_DIR}
+# Copy our local ansible-runner-http replacement module
+COPY images/ansible-operator/ansible_runner_http /ansible_runner_http
 COPY openshift/install-ansible.sh .
 RUN chmod +x /install-ansible.sh \
     && ./install-ansible.sh

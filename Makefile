@@ -130,7 +130,7 @@ test-docs: ## Test doc links
 ENVTEST_VERSION = $(shell go list -m k8s.io/client-go | cut -d" " -f2 | sed 's/^v0\.\([[:digit:]]\{1,\}\)\.[[:digit:]]\{1,\}$$/1.\1.x/')
 TEST_PKGS = $(shell go list ./... | grep -v -E 'github.com/operator-framework/ansible-operator-plugins/test/')
 test-unit: $(SETUP_ENVTEST) ## Run unit tests
-	KUBEBUILDER_ASSETS="$(shell $(SETUP_ENVTEST) use $(ENVTEST_VERSION) -p path)" go test -coverprofile=coverage.out -covermode=count -short $(TEST_PKGS)
+	KUBEBUILDER_ASSETS="$(shell $(SETUP_ENVTEST) use --use-deprecated-gcs=false $(ENVTEST_VERSION) -p path)" go test -coverprofile=coverage.out -covermode=count -short $(TEST_PKGS)
 
 e2e_tests := test-e2e-ansible test-e2e-ansible-molecule
 e2e_targets := test-e2e $(e2e_tests)
