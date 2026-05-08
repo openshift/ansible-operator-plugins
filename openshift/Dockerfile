@@ -29,7 +29,7 @@ RUN dnf clean all && rm -rf /var/cache/dnf/* \
     && pushd /usr/local/bin && ln -sf ../../bin/python3.12 python3 && popd \
     && python3 -m ensurepip --upgrade \
     # python3-six conflicts with pip-installed packages on RHEl/CentOS 10; remove it if present
-    && { dnf remove -y python3-six || true; }
+    && { rpm -q python3-six && dnf remove -y python3-six || true; }
 
 # Add steps for cachito
 ENV REMOTE_SOURCES=${REMOTE_SOURCES:-"./openshift/"}
