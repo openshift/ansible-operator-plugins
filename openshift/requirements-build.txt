@@ -27,6 +27,7 @@ packaging==26.0
     #   -r requirements-build.in
     #   hatchling
     #   setuptools-scm
+    #   vcs-versioning
     #   wheel
 pathspec==1.0.4
     # via
@@ -38,18 +39,22 @@ pluggy==1.6.0
     # via
     #   -r requirements-build.in
     #   hatchling
-poetry-core==2.3.1
+poetry-core==2.3.2
     # via -r requirements-build.in
 semver==3.0.4
     # via
     #   -r requirements-build.in
     #   changelog-chug
-setuptools-scm==9.2.2
+setuptools-scm==10.0.5
     # via hatch-vcs
 trove-classifiers==2026.1.14.14
     # via
     #   -r requirements-build.in
     #   hatchling
+vcs-versioning==1.1.1
+    # via
+    #   -r requirements-build.in
+    #   setuptools-scm
 wheel==0.46.3
     # via -r requirements-build.in
 

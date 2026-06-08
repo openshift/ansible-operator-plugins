@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.7 AS basebuilder
+FROM registry.redhat.io/ubi10/ubi-minimal:10.1 AS basebuilder
 
 # Install Rust so that we can ensure backwards compatibility with installing/building the cryptography wheel across all platforms
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y

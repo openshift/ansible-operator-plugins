@@ -1,4 +1,4 @@
-FROM registry.ci.openshift.org/ocp/4.22:base-rhel9
+FROM registry.redhat.io/ubi10/ubi:10.1
 
 RUN set -e && dnf clean all && rm -rf /var/cache/dnf/* \
   && dnf update -y \
