@@ -87,6 +87,13 @@ Stage 4  │  Conflict detection + phase splitting  →  3 build .txt files
          │    (e.g. wheel==0.45.1 from ansible-core's pyproject.toml)
          │    and injects them into pre-build; later phases resolve newer versions
          │
+Stage 4b │  Close transitive build-dep graph (sdist pyproject.toml)  →  patched
+         │  ↳ Packages pip-compile pulled in only as a dependency-of-a-dependency
+         │    (e.g. trove-classifiers, via hatchling) were never scanned by
+         │    pip_find_builddeps.py; their own build-system requirements
+         │    (e.g. calver) are fetched directly and injected, iterating to a
+         │    fixed point
+         │
 Stage 5  │  Safety CVE scan of build files  →  auto-fix or FAIL
          │
 Stage 6  │  Verify every Pipfile.lock package is in requirements.txt
@@ -388,6 +395,100 @@ When a single-package phase fails to compile, the script:
 
 ---
 
+## Stage 4b — Transitive Build-Dependency Closure
+
+### The Problem: Second-Order Build Tools
+
+Stage 3 runs `pip_find_builddeps.py` on every package in `pip freeze --all` —
+i.e. every **runtime** package pinned in `Pipfile.lock`. But the compiled
+build requirements files also end up containing packages that were pulled in
+purely as a *runtime dependency of a build tool*, never scanned by Stage 3 at
+all. For example: `ansible-core`'s build system needs `hatch-vcs`, which
+depends on `hatchling`, which in turn depends on `trove-classifiers` — a pure
+metadata package with no build deps of its own that anyone actually calls
+Stage 3 on.
+
+Most of the time this doesn't matter, because most such packages don't need
+anything extra to build. But some do. `trove-classifiers`' own
+`pyproject.toml` declares:
+
+```toml
+[build-system]
+requires = ["setuptools", "calver"]
+```
+
+`calver` is a setuptools plugin that computes `trove-classifiers`' own
+calendar-based version at build time — nothing in `requirements-build.txt`
+would ever reference it unless something specifically goes looking.
+
+### Why `pip_find_builddeps.py` Can't Find It Either
+
+Even running `pip_find_builddeps.py` directly on `trove-classifiers` wouldn't
+help. It relies on pip's own dependency-report machinery, and per
+[pypa/pip#7863][pip-7863], **pip does not surface a package's `[build-system]
+requires` when a compatible wheel is already available** — pip just installs
+the wheel and never invokes the build backend, so the requirement is
+invisible to any tool built on top of pip's reporting.
+
+That would be a non-issue for a normal (non-hermetic) `pip install` — except
+Hermeto (Cachi2), the tool ART/Konflux uses to prefetch dependencies for the
+network-isolated hermetic build, **defaults to source-only prefetching**: no
+binary wheels are fetched for *any* package, so every package — including
+ones with a perfectly good wheel — is built from its sdist inside the
+hermetic sandbox, invoking its `[build-system] requires` regardless. If that
+requirement wasn't prefetched, the build fails with:
+
+```
+Collecting setuptools
+  Using cached setuptools-82.0.1-py3-none-any.whl
+ERROR: Could not find a version that satisfies the requirement calver (from versions: none)
+```
+
+[pip-7863]: https://github.com/pypa/pip/issues/7863
+
+### The Fix: Read `pyproject.toml` Directly
+
+`_pyproject_build_system_requires(name, version)` sidesteps pip's blind spot
+entirely by fetching the package's `pyproject.toml` straight from its sdist on
+PyPI and parsing `[build-system].requires` with `tomllib` — no pip involved,
+so the wheel-availability shortcut never applies.
+
+`stage4b_close_transitive_build_deps()` uses this to iteratively close the
+build-dependency graph:
+
+```
+LOOP (up to 5 passes, converges in 1-2 in practice):
+  for each build phase file (pre-build / build1 / build):
+    resolved = packages actually pinned in the compiled .txt
+    new      = resolved packages not yet probed (by Stage 3 or a prior pass)
+    for each new package:
+      requires = fetch its own [build-system].requires from its sdist
+      for each requirement not already pinned somewhere in this phase:
+        queue it as an addition
+    if any additions were queued:
+      append them to the phase's .in file and re-run pip-compile
+STOP when a full pass finds nothing new
+```
+
+Newly-discovered packages from one pass (e.g. `calver` itself) are re-probed
+in the next pass, so a chain of missing build deps (A needs B, B needs C)
+resolves fully rather than stopping after one hop — this is exactly the same
+one-hop limitation `pip_find_builddeps.py` already has for *first*-order
+packages (see Step 4 of `split_phases()` above), just applied recursively
+instead of being a known, accepted gap.
+
+If an injected requirement's environment marker doesn't apply to the Python
+version generating requirements (e.g. `tomli; python_version < "3.11"` under
+Python 3.12), pip-compile correctly omits it from the compiled output —
+the addition is still tried, it just resolves to "nothing needed here."
+
+This is entirely automatic and package-agnostic: no `calver`-specific
+knowledge is hardcoded anywhere in the script. If a future package pulled in
+transitively needs some other undeclared-to-pip build tool, this stage
+discovers and pins it the same way, without a script change.
+
+---
+
 ## Stage 5 — Build Dependency CVE Scanning
 
 After generating all build files, Safety is used to scan each one for known
@@ -448,14 +549,17 @@ remainder compiles).
 
 In a full local run of the current Pipfile (`make -f openshift/Makefile
 generate-requirements`, ~30 runtime packages, 27 of which needed build-dep
-collection), the entire script — Stages 1 through 6 — completed in well under
-5 minutes; the dnf/toolchain setup portion of the Docker build (cached in
-normal iterative use) is separate from this and unaffected by the script
-itself. In a network-restricted environment, `pip_find_builddeps.py` can fail
-per-package (skipped with a warning, as designed) which shortens Stage 3 but
-produces incomplete build-dep data — this only affects Stage 4's output, not
-the runtime `requirements.txt` from Stages 1/2/6, which involves no per-package
-network calls beyond the initial `pipenv install`/`pip freeze`.
+collection), the entire script — Stages 1 through 6, including 4b — completed
+in well under 5 minutes; the dnf/toolchain setup portion of the Docker build
+(cached in normal iterative use) is separate from this and unaffected by the
+script itself. In a network-restricted environment, `pip_find_builddeps.py`
+can fail per-package (skipped with a warning, as designed) which shortens
+Stage 3 but produces incomplete build-dep data — this only affects Stage 4's
+output, not the runtime `requirements.txt` from Stages 1/2/6, which involves
+no per-package network calls beyond the initial `pipenv install`/`pip freeze`.
+Stage 4b adds its own per-package PyPI/sdist round-trips (one per
+newly-discovered package per pass), but in practice only a handful of
+packages are ever newly-discovered, and it converges in 1-2 passes.
 
 ---
 
@@ -468,6 +572,7 @@ network calls beyond the initial `pipenv install`/`pip freeze`.
 | `_read_pinned(text)` | Parse pip-freeze/pip-compile output → `{norm: "Pkg==ver"}` |
 | `_comment_out(text, norms)` | Prefix matching `pkg==` lines with `#` |
 | `_normalize_quirks(text)` | Fix `python-dateutil==2.9.0.post0` → `2.9.0` |
+| `_pyproject_build_system_requires(name, ver)` | Fetch `[build-system].requires` directly from a package's sdist `pyproject.toml` on PyPI, bypassing pip's [issue #7863][pip-7863] blind spot (Stage 4b) |
 | `_strip_ansi(text)` | Remove terminal colour codes from Safety output |
 | `_parse_vuln_report(text)` | Parse Safety text into `[{package, version, vuln_id, affected_spec}]` |
 | `_min_safe_version(spec)` | Extract fix version from `"<X.Y.Z"` Safety spec |
