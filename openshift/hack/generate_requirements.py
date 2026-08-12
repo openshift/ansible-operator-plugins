@@ -27,6 +27,23 @@ Stage 4 — Detect version conflicts across all build-dep sets by attempting
            build deps require the *older* version of a conflicting dep go into
            an earlier phase) with bisection fallback.  Map discovered phases to
            the three output files and compile each.
+Stage 4b — Close the *transitive* build-dep graph: packages that pip-compile
+           pulled into a build phase only as a dependency-of-a-dependency
+           (e.g. trove-classifiers, resolved because hatchling needs it) were
+           never scanned by pip_find_builddeps.py in Stage 3, which only runs
+           on Pipfile.lock's runtime packages. Some of these have their own
+           exact build-system requirements that pip_find_builddeps.py cannot
+           discover even if it were run on them directly, because it relies on
+           pip's dependency-report machinery, which does not surface a
+           package's [build-system] requires when a compatible wheel already
+           exists (https://github.com/pypa/pip/issues/7863) — yet Hermeto's
+           hermetic pip prefetcher defaults to source-only mode, so every
+           package is actually built from its sdist regardless of wheel
+           availability. This stage fetches each newly-resolved package's
+           pyproject.toml directly from its sdist and injects any undeclared
+           build-system requirement (e.g. calver, required to build
+           trove-classifiers from source) into the owning phase, iterating to
+           a fixed point.
 Stage 5 — Scan every generated build requirements file for CVEs and attempt to
            auto-fix them.  Exits non-zero if any CVE cannot be auto-fixed, so
            the failure can't be missed in build logs.
@@ -50,11 +67,17 @@ Prerequisites
 from __future__ import annotations
 
 import argparse
+import io
+import json
 import re
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
+import tomllib
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -170,6 +193,69 @@ def _normalize_quirks(text: str) -> str:
         text,
     )
     return text
+
+
+def _pyproject_build_system_requires(name: str, version: str) -> list[str]:
+    """
+    Fetch a package's OWN `[build-system] requires` directly from its sdist's
+    pyproject.toml on PyPI, bypassing pip entirely.
+
+    pip_find_builddeps.py (Stage 3) discovers build-system requirements via
+    pip's own dependency-report machinery, which does not surface a package's
+    build-system requirements when a compatible wheel is already available —
+    pip simply installs the wheel and never invokes the build backend
+    (https://github.com/pypa/pip/issues/7863). Hermeto/Cachi2 defaults to
+    *source-only* prefetching for pip (no wheels at all), so every package —
+    even ones with wheels — gets built from its sdist inside the hermetic
+    sandbox, invoking its build-system requirements regardless. Reading
+    pyproject.toml directly sidesteps pip's blind spot.
+
+    Returns [] on any failure (no sdist, no pyproject.toml, no [build-system]
+    table, network error, etc.) — a missing result here just means "nothing
+    new to add", not "this package needs nothing" (the legacy PEP 517 default
+    of setuptools+wheel is already present in every phase).
+    """
+    try:
+        url = f"https://pypi.org/pypi/{name}/{version}/json"
+        with urllib.request.urlopen(url, timeout=20) as resp:
+            data = json.load(resp)
+    except (urllib.error.URLError, TimeoutError, ValueError) as e:
+        print(f"    WARNING: could not fetch PyPI metadata for {name}=={version}: {e}", file=sys.stderr)
+        return []
+
+    sdist_url = next(
+        (u["url"] for u in data.get("urls", []) if u.get("packagetype") == "sdist"),
+        None,
+    )
+    if not sdist_url:
+        return []
+
+    try:
+        with urllib.request.urlopen(sdist_url, timeout=60) as resp:
+            raw = resp.read()
+        tf = tarfile.open(fileobj=io.BytesIO(raw))
+    except (urllib.error.URLError, TimeoutError, tarfile.TarError) as e:
+        print(f"    WARNING: could not download/open sdist for {name}=={version}: {e}", file=sys.stderr)
+        return []
+
+    with tf:
+        # The sdist's pyproject.toml lives at the top level of its single
+        # top-level directory, e.g. "trove_classifiers-2026.6.1.19/pyproject.toml".
+        member = next(
+            (m for m in tf.getmembers()
+             if m.name.endswith("pyproject.toml") and m.name.count("/") <= 1),
+            None,
+        )
+        if member is None:
+            return []
+        try:
+            content = tf.extractfile(member).read()
+            parsed = tomllib.loads(content.decode("utf-8"))
+        except (tomllib.TOMLDecodeError, UnicodeDecodeError, AttributeError):
+            return []
+
+    requires = parsed.get("build-system", {}).get("requires", [])
+    return [str(r) for r in requires]
 
 
 def _strip_ansi(text: str) -> str:
@@ -1046,6 +1132,120 @@ def stage4_build_phases(
 
 
 # ---------------------------------------------------------------------------
+# Stage 4b — Close the transitive build-dependency graph
+# ---------------------------------------------------------------------------
+
+
+def stage4b_close_transitive_build_deps(
+    out_dir: Path,
+    scanned: set[str],
+    max_iterations: int = 5,
+) -> None:
+    """
+    Close the build-dependency graph for packages that appear in a compiled
+    requirements-build*.txt file only as a TRANSITIVE dependency of a package
+    Stage 3 actually scanned (e.g. trove-classifiers, pulled in solely because
+    hatchling needs it). Stage 3 never runs pip_find_builddeps.py on these —
+    it only scans Pipfile.lock's runtime packages — so their own build-system
+    requirements (declared in *their* pyproject.toml) are otherwise never
+    discovered. See _pyproject_build_system_requires() for why
+    pip_find_builddeps.py itself cannot fill this gap even if pointed at them
+    directly.
+
+    Repeatedly, for each build phase file:
+      1. Parse the compiled .txt for its resolved {pkg: version} set.
+      2. For every resolved package not yet probed, fetch its OWN
+         [build-system] requires directly from its sdist's pyproject.toml.
+      3. Any requirement whose package isn't already pinned somewhere in that
+         phase is appended to the phase's .in file, which is then recompiled.
+    Stops when a full pass discovers nothing new, or after max_iterations
+    passes (safety valve — a normal run converges in 1-2 passes).
+    """
+    print("\n══ Stage 4b: Close transitive build-dep graph (sdist pyproject.toml) ══")
+
+    phases = [
+        ("requirements-pre-build", "pre-build"),
+        ("requirements-build1", "build1"),
+        ("requirements-build", "build"),
+    ]
+    rpm_norms = {_norm(p) for p in RPM_INSTALLED}
+    probed: set[str] = set(scanned)
+
+    for iteration in range(1, max_iterations + 1):
+        print(f"\n  Pass {iteration}:")
+        any_new = False
+
+        for base, label in phases:
+            txt_path = out_dir / f"{base}.txt"
+            in_path = out_dir / f"{base}.in"
+            if not txt_path.exists() or not in_path.exists():
+                continue
+
+            resolved = _read_pinned(txt_path.read_text())
+            new_pkgs = {n: v for n, v in resolved.items() if n not in probed}
+            if not new_pkgs:
+                continue
+
+            print(
+                f"    {label}: probing {len(new_pkgs)} newly-resolved"
+                f" package(s) not covered by Stage 3: {sorted(new_pkgs)}"
+            )
+
+            additions: list[str] = []
+            queued_norms: set[str] = set()
+            for norm, pkg_line in sorted(new_pkgs.items()):
+                probed.add(norm)
+                pkg_name, pkg_version = pkg_line.split("==", 1)
+                requires = _pyproject_build_system_requires(pkg_name, pkg_version)
+                for req in requires:
+                    m = re.match(r"^([A-Za-z0-9][A-Za-z0-9._-]*)", req.strip())
+                    if not m:
+                        continue
+                    req_norm = _norm(m.group(1))
+                    if req_norm in resolved or req_norm in queued_norms:
+                        continue  # already pinned in this phase, or already queued below
+                    additions.append(req.strip())
+                    queued_norms.add(req_norm)
+                    print(
+                        f"      + {req.strip()}  (build-system requirement of"
+                        f" {pkg_name}=={pkg_version}, undetected by"
+                        " pip_find_builddeps.py — see pypa/pip#7863)"
+                    )
+
+            if not additions:
+                continue
+
+            original_in = in_path.read_text()
+            in_path.write_text(original_in.rstrip("\n") + "\n" + "\n".join(additions) + "\n")
+            ok, stderr = _pip_compile(in_path, txt_path, ["--allow-unsafe"])
+            if not ok:
+                print(
+                    f"    WARNING: pip-compile failed after injecting"
+                    f" {additions} into {label}; reverting:\n{stderr}",
+                    file=sys.stderr,
+                )
+                in_path.write_text(original_in)
+                continue
+
+            any_new = True
+            content = _normalize_quirks(txt_path.read_text())
+            content = _comment_out(content, rpm_norms)
+            txt_path.write_text(content)
+            print(f"    → {txt_path.name} recompiled ({len(content.splitlines())} lines)")
+
+        if not any_new:
+            print("  No new transitive build deps discovered — closure complete.")
+            break
+    else:
+        print(
+            f"  WARNING: reached max_iterations={max_iterations} without a"
+            " pass discovering nothing new; re-run generate_requirements.py"
+            " if newly-added packages keep introducing further build deps.",
+            file=sys.stderr,
+        )
+
+
+# ---------------------------------------------------------------------------
 # Stage 5 — CVE checking for build requirements files
 # ---------------------------------------------------------------------------
 
@@ -1395,6 +1595,10 @@ def main() -> None:
 
         # Stage 4 — detect conflicts, split phases, compile build files
         stage4_build_phases(pkg_constraints, out_dir, tmp)
+
+        # Stage 4b — close the transitive build-dep graph (e.g. calver, needed
+        # to build trove-classifiers from source but invisible to Stage 3)
+        stage4b_close_transitive_build_deps(out_dir, set(pkg_constraints.keys()))
 
         # Stage 5 — check generated build requirements for CVEs and auto-fix
         stage5_check_build_dep_cves(out_dir, tmp)
