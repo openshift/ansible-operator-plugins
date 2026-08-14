@@ -35,6 +35,13 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip==26.1.2
 #   3. Collects per-package build-system requirements via pip_find_builddeps.py.
 #   4. Detects version conflicts across all build deps using pip-compile + error
 #      parsing and splits conflicting packages into ordered installation phases.
+#   4b. Closes the *transitive* build-dep graph: packages pulled into a build
+#      phase only as a dependency-of-a-dependency (e.g. trove-classifiers, via
+#      hatchling) are never scanned by pip_find_builddeps.py in step 3. Their
+#      own build-system requirements (e.g. calver, needed to build
+#      trove-classifiers from source under Hermeto's source-only pip prefetch
+#      mode) are fetched directly from each package's sdist pyproject.toml and
+#      injected, iterating to a fixed point.
 #   5. Produces requirements-pre-build.txt, requirements-build1.txt,
 #      requirements-build.txt, and requirements.txt with RPM-installed packages
 #      (cryptography, cffi, pycparser, maturin) commented out in every file.
