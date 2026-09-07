@@ -22,6 +22,11 @@ import (
 
 	"github.com/operator-framework/ansible-operator-plugins/internal/cmd/ansible-operator/run"
 	"github.com/operator-framework/ansible-operator-plugins/internal/cmd/ansible-operator/version"
+	// Registers the OpenShift centralized TLS security profile policy (see
+	// internal/ansible/openshifttls) with the run.ClusterTLSPolicy extension
+	// point (OCPSTRAT-2611). Downstream-only: not part of upstream
+	// ansible-operator-plugins.
+	_ "github.com/operator-framework/ansible-operator-plugins/internal/ansible/openshifttls"
 )
 
 func main() {

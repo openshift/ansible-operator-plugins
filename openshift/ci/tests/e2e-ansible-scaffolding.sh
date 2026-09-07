@@ -143,17 +143,23 @@ EOF
     fi
 }
 
-echo "Creating temporary copy of test operator to avoid modifying synced upstream files"
-TESTDIR="$(mktemp -d)"
-trap_add "rm -rf $TESTDIR" EXIT
-cp -r $ROOTDIR/testdata/memcached-molecule-operator $TESTDIR/
-pushd $TESTDIR/memcached-molecule-operator
-ls
+# Deploy the operator: copies testdata to a scratch dir, applies the
+# pre-deploy patches (memory limit, project.openshift.io RBAC), runs
+# `make deploy`, creates the metrics clusterrolebinding, and switches to
+# the operator's namespace. Leaves the caller pushd'd into the scratch
+# copy so it can continue with test_operator/make undeploy.
+deploy_operator() {
+    echo "Creating temporary copy of test operator to avoid modifying synced upstream files"
+    TESTDIR="$(mktemp -d)"
+    trap_add "rm -rf $TESTDIR" EXIT
+    cp -r $ROOTDIR/testdata/memcached-molecule-operator $TESTDIR/
+    pushd $TESTDIR/memcached-molecule-operator
+    ls
 
-# Pre-configure deployment memory limit to avoid pod restart after deployment
-# This prevents leader election conflicts that would occur during rolling updates
-echo "Configuring deployment memory limit to 1Gi for cluster-wide secret watching"
-cat <<EOF > config/manager/memory_patch.yaml
+    # Pre-configure deployment memory limit to avoid pod restart after deployment
+    # This prevents leader election conflicts that would occur during rolling updates
+    echo "Configuring deployment memory limit to 1Gi for cluster-wide secret watching"
+    cat <<EOF > config/manager/memory_patch.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -169,37 +175,50 @@ spec:
             memory: 1Gi
 EOF
 
-# Add the memory patch to kustomization.yaml
-cat <<EOF >> config/manager/kustomization.yaml
+    # Add the memory patch to kustomization.yaml
+    cat <<EOF >> config/manager/kustomization.yaml
 
 patches:
 - path: memory_patch.yaml
 EOF
 
-# deploy operator
-echo "running make deploy"
-make deploy IMG=$IMAGE
+    # deploy operator
+    echo "running make deploy"
+    make deploy IMG=$IMAGE
 
-# Hack: Add missing RBAC permission for operations related to `project.openshift.io`
-# This is required for the Ansible Task: `create project if projects are available`
-# TODO: Upstream PR to fix it: https://github.com/operator-framework/ansible-operator-plugins/pull/93
-kubectl patch clusterrole memcached-molecule-operator-manager-role --type='json' -p='[
-  {
-    "op": "add",
-    "path": "/rules/-",
-    "value": {
-      "apiGroups": ["project.openshift.io"],
-      "resources": ["projectrequests", "projects"],
-      "verbs": ["create", "delete", "get", "list", "patch", "update", "watch"]
-    }
-  }
-]'
+    # Hack: Add missing RBAC permission for operations related to `project.openshift.io`
+    # This is required for the Ansible Task: `create project if projects are available`
+    # TODO: Upstream PR to fix it: https://github.com/operator-framework/ansible-operator-plugins/pull/93
+    kubectl patch clusterrole memcached-molecule-operator-manager-role --type='json' -p='[
+      {
+        "op": "add",
+        "path": "/rules/-",
+        "value": {
+          "apiGroups": ["project.openshift.io"],
+          "resources": ["projectrequests", "projects"],
+          "verbs": ["create", "delete", "get", "list", "patch", "update", "watch"]
+        }
+      }
+    ]'
 
-# create clusterrolebinding for metrics
-kubectl create clusterrolebinding memcached-molecule-operator-metrics-reader-rolebinding --clusterrole=memcached-molecule-operator-metrics-reader --serviceaccount=memcached-molecule-operator-system:default
+    # create clusterrolebinding for metrics
+    kubectl create clusterrolebinding memcached-molecule-operator-metrics-reader-rolebinding --clusterrole=memcached-molecule-operator-metrics-reader --serviceaccount=memcached-molecule-operator-system:default
 
-# switch to the "memcached-molecule-operator-system" namespace
-oc project memcached-molecule-operator-system
+    # switch to the "memcached-molecule-operator-system" namespace
+    oc project memcached-molecule-operator-system
+}
+
+echo "running deploy_operator"
+deploy_operator
+
+# DEPLOY_ONLY=true is used by CI jobs (e.g. tls13-adherence) that just need a
+# running operator to point another tool at, without the CR-based functional
+# test or teardown below.
+if [[ "${DEPLOY_ONLY:-false}" == "true" ]]; then
+    echo "DEPLOY_ONLY=true: operator deployed; skipping functional test, metrics rolebinding cleanup, and undeploy"
+    popd
+    exit 0
+fi
 
 # Test the operator
 echo "running test_operator"
