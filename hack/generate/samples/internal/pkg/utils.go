@@ -80,7 +80,7 @@ func removeAllAnnotationLines(annotations map[string]string, filePaths []string)
 		for _, re := range annotationREs {
 			b = re.ReplaceAll(b, []byte{})
 		}
-		err = os.WriteFile(file, b, 0644)
+		err = os.WriteFile(file, b, 0600)
 		if err != nil {
 			return err
 		}

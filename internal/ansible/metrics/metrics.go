@@ -80,11 +80,13 @@ func recoverMetricPanic() {
 	}
 }
 
+// RegisterBuildInfo registers the build_info gauge with the given Prometheus registerer.
 func RegisterBuildInfo(r prometheus.Registerer) {
 	buildInfo.Set(1)
 	r.MustRegister(buildInfo)
 }
 
+// UserMetric represents a user-defined Prometheus metric submitted via the metrics API.
 type UserMetric struct {
 	Name      string               `json:"name" yaml:"name"`
 	Help      string               `json:"description" yaml:"description"`
@@ -94,11 +96,13 @@ type UserMetric struct {
 	Summary   *UserMetricSummary   `json:"summary,omitempty" yaml:"summary,omitempty"`
 }
 
+// UserMetricCounter holds the operation to apply to a counter metric.
 type UserMetricCounter struct {
 	Inc bool    `json:"increment,omitempty" yaml:"increment,omitempty"`
 	Add float64 `json:"add,omitempty" yaml:"add,omitempty"`
 }
 
+// UserMetricGauge holds the operation to apply to a gauge metric.
 type UserMetricGauge struct {
 	Set              float64 `json:"set,omitempty" yaml:"set,omitempty"`
 	Inc              bool    `json:"increment,omitempty" yaml:"increment,omitempty"`
@@ -108,10 +112,12 @@ type UserMetricGauge struct {
 	Sub              float64 `json:"subtract,omitempty" yaml:"subtract,omitempty"`
 }
 
+// UserMetricHistogram holds the observation value for a histogram metric.
 type UserMetricHistogram struct {
 	Observe float64 `json:"observe,omitempty" yaml:"observe,omitempty"`
 }
 
+// UserMetricSummary holds the observation value for a summary metric.
 type UserMetricSummary struct {
 	Observe float64 `json:"observe,omitempty" yaml:"observe,omitempty"`
 }
@@ -219,6 +225,7 @@ func ensureMetric(r prometheus.Registerer, metricSpec UserMetric) {
 	}
 }
 
+// HandleUserMetric validates, registers (if needed), and applies the operation described by metricSpec.
 func HandleUserMetric(r prometheus.Registerer, metricSpec UserMetric) error {
 	if err := validateMetricSpec(metricSpec); err != nil {
 		return err
@@ -244,17 +251,20 @@ func HandleUserMetric(r prometheus.Registerer, metricSpec UserMetric) error {
 	return nil
 }
 
+// ReconcileSucceeded increments the successful reconciliation counter for the given GVK.
 func ReconcileSucceeded(gvk string) {
 	defer recoverMetricPanic()
 	reconcileResults.WithLabelValues(gvk, "succeeded").Inc()
 }
 
+// ReconcileFailed increments the failed reconciliation counter for the given GVK.
 func ReconcileFailed(gvk string) {
 	// TODO: consider taking in a failure reason
 	defer recoverMetricPanic()
 	reconcileResults.WithLabelValues(gvk, "failed").Inc()
 }
 
+// ReconcileTimer returns a Prometheus timer that records reconciliation duration for the given GVK.
 func ReconcileTimer(gvk string) *prometheus.Timer {
 	defer recoverMetricPanic()
 	return prometheus.NewTimer(prometheus.ObserverFunc(func(duration float64) {

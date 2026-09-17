@@ -43,9 +43,6 @@ func AllowProjectBeMultiGroup(sample sample.Sample) error {
 	}
 
 	projectBytes = append([]byte(multiGroup), projectBytes...)
-	err = os.WriteFile(filepath.Join(sample.Dir(), "PROJECT"), projectBytes, 0644)
-	if err != nil {
-		return err
-	}
-	return nil
+	projectPath := filepath.Join(sample.Dir(), "PROJECT")
+	return os.WriteFile(projectPath, projectBytes, 0600)
 }

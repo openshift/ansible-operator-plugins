@@ -139,6 +139,7 @@ func extractHost(header string) (host string) {
 	return host
 }
 
+// ServeHTTP delegates accepted requests and rejects forbidden ones with 403.
 func (f *FilterServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	host := extractHost(req.Host)
 	if f.accept(req.Method, req.URL.Path, host) {
@@ -160,6 +161,7 @@ type server struct {
 
 type responder struct{}
 
+// Error writes an HTTP 500 response with the error message.
 func (r *responder) Error(w http.ResponseWriter, req *http.Request, err error) {
 	log.Error(err, "Error while proxying request")
 	http.Error(w, err.Error(), http.StatusInternalServerError)

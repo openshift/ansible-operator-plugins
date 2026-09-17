@@ -51,6 +51,7 @@ type loggingEventHandler struct {
 	mux      *sync.Mutex
 }
 
+// Handle logs an ansible-runner job event at the configured verbosity level.
 func (l loggingEventHandler) Handle(ident string, u *unstructured.Unstructured, e eventapi.JobEvent) {
 	if l.LogLevel == Nothing {
 		return

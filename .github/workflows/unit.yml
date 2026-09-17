@@ -1,3 +1,6 @@
+# Unit workflow: runs on every PR.
+# Validates: unit tests with envtest and -short flag.
+# Make target: make test-unit (part of make verify / make test-static)
 name: unit
 on:
   pull_request: {}
@@ -6,11 +9,28 @@ jobs:
   unit:
     name: unit
     runs-on: ubuntu-22.04
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@v6
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
+          cache: true
           go-version-file: "go.mod"
-      - run: make test-unit
+      - name: Run unit tests with coverage
+        run: make test-unit
+      - name: Checksum coverage report
+        if: always()
+        run: sha256sum coverage.out > coverage.out.sha256
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: coverage-report
+          path: |
+            coverage.out
+            coverage.out.sha256
+          retention-days: 14

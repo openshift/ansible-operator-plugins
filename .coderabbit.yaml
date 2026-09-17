@@ -1,0 +1,10 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# See https://docs.coderabbit.ai/reference/configuration for all fields and default values
+knowledge_base:
+  code_guidelines:
+    filePatterns:
+      - "docs/domain/*.md"
+      - "docs/architecture/*.md"
+      - "docs/references/*.md"
+      - "docs/AOP_DEVELOPMENT.md"
+      - "docs/AOP_TESTING.md"

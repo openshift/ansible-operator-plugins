@@ -10,8 +10,8 @@ type Generator struct {
 	webhook     bool
 	preInit     GeneratorHook
 	postInit    GeneratorHook
-	preApi      GeneratorHook
-	postApi     GeneratorHook
+	preAPI      GeneratorHook
+	postAPI     GeneratorHook
 	preWebhook  GeneratorHook
 	postWebhook GeneratorHook
 }
@@ -60,14 +60,14 @@ func WithPostInitHook(hook GeneratorHook) GeneratorOptions {
 // WithPreApiHook will configure a Generator to run the given GeneratorHook before executing the GenerateApi function of a Sample
 func WithPreApiHook(hook GeneratorHook) GeneratorOptions {
 	return func(g *Generator) {
-		g.preApi = hook
+		g.preAPI = hook
 	}
 }
 
 // WithPostApiHook will configure a Generator to run the given GeneratorHook after executing the GenerateApi function of a Sample
 func WithPostApiHook(hook GeneratorHook) GeneratorOptions {
 	return func(g *Generator) {
-		g.postApi = hook
+		g.postAPI = hook
 	}
 }
 
@@ -96,8 +96,8 @@ func NewGenerator(opts ...GeneratorOptions) *Generator {
 		webhook:     true,
 		preInit:     defaultHook,
 		postInit:    defaultHook,
-		preApi:      defaultHook,
-		postApi:     defaultHook,
+		preAPI:      defaultHook,
+		postAPI:     defaultHook,
 		preWebhook:  defaultHook,
 		postWebhook: defaultHook,
 	}
@@ -123,12 +123,12 @@ func (g *Generator) GenerateSamples(samples ...Sample) error {
 		}
 
 		if g.api {
-			g.preApi(sample)
+			g.preAPI(sample)
 			err := sample.GenerateApi()
 			if err != nil {
 				return fmt.Errorf("error in api generation for sample %s: %w", sample.Name(), err)
 			}
-			g.postApi(sample)
+			g.postAPI(sample)
 		}
 
 		if g.webhook {

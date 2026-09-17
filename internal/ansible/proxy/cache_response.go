@@ -56,6 +56,7 @@ type cacheResponseHandler struct {
 	skipPathRegexp    []*regexp.Regexp
 }
 
+// ServeHTTP intercepts GET requests to serve from cache and forwards mutating requests to the API server.
 func (c *cacheResponseHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case http.MethodGet:

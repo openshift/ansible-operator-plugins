@@ -1,0 +1,23 @@
+repos:
+  - repo: https://github.com/dnephin/pre-commit-golang
+    rev: fb24a639f7c938759fe56eeebbb7713b69d60494 # v0.5.1
+    hooks:
+      - id: go-fmt
+      - id: go-vet
+  - repo: https://github.com/golangci/golangci-lint
+    rev: 89476e7a1eaa0a8a06c17343af960a5fd9e7edb7 # v1.62.2
+    hooks:
+      - id: golangci-lint
+        args: [--timeout=5m]
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: 5f9c312d9978fbcee1da97154ba385834eeda799 # v4.0.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args: [feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert]
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: 01886c8a910c64595c47f186ca1ffc0b77fa5458 # v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: [--baseline, .secrets.baseline]
+        exclude: ^(vendor/|openshift/vendor/|testdata/)

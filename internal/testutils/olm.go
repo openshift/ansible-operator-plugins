@@ -66,7 +66,7 @@ func (tc TestContext) AddPackagemanifestsTarget(operatorType projutil.OperatorTy
 
 	// update makefile by adding the packagemanifests target
 	makefileBytes = append([]byte(makefilePackagemanifestsFragment), makefileBytes...)
-	err = os.WriteFile(filepath.Join(tc.Dir, "Makefile"), makefileBytes, 0644)
+	err = os.WriteFile(filepath.Join(tc.Dir, "Makefile"), makefileBytes, 0600)
 	if err != nil {
 		return err
 	}

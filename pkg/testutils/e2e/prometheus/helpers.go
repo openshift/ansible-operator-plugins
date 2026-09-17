@@ -9,7 +9,7 @@ import (
 
 // InstallPrometheusOperator will install the Prometheus operator onto a Kubernetes cluster
 func InstallPrometheusOperator(kubectl kubernetes.Kubectl) error {
-	url, err := getPrometheusOperatorUrl(kubectl)
+	url, err := getPrometheusOperatorURL(kubectl)
 	if err != nil {
 		return fmt.Errorf("encountered an error when getting the bundle URL: %w", err)
 	}
@@ -24,7 +24,7 @@ func InstallPrometheusOperator(kubectl kubernetes.Kubectl) error {
 
 // UninstallPrometheusOperator will uninstall a Prometheus operator from a Kubernetes cluster
 func UninstallPrometheusOperator(kubectl kubernetes.Kubectl) error {
-	url, err := getPrometheusOperatorUrl(kubectl)
+	url, err := getPrometheusOperatorURL(kubectl)
 	if err != nil {
 		return fmt.Errorf("encountered an error when getting the bundle URL: %w", err)
 	}
@@ -36,9 +36,9 @@ func UninstallPrometheusOperator(kubectl kubernetes.Kubectl) error {
 	return nil
 }
 
-// getPrometheusOperatorUrl is a helper function to determine the Prometheus
+// getPrometheusOperatorURL is a helper function to determine the Prometheus
 // operator that should be installed on a cluster based on the Kubernetes version
-func getPrometheusOperatorUrl(kubectl kubernetes.Kubectl) (string, error) {
+func getPrometheusOperatorURL(kubectl kubernetes.Kubectl) (string, error) {
 	prometheusOperatorLegacyVersion := "0.33"
 	prometheusOperatorLegacyURL := "https://raw.githubusercontent.com/coreos/prometheus-operator/release-%s/bundle.yaml"
 	prometheusOperatorVersion := "0.51"

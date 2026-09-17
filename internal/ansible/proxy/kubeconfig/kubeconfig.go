@@ -62,6 +62,7 @@ type values struct {
 	Namespace string
 }
 
+// NamespacedOwnerReference pairs a Kubernetes OwnerReference with its namespace.
 type NamespacedOwnerReference struct {
 	metav1.OwnerReference
 	Namespace string

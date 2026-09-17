@@ -1,0 +1,63 @@
+linters:
+  enable:
+    - govet
+    - errcheck
+    - staticcheck
+    - unused
+    - ineffassign
+    - gosimple
+    - revive
+    - gosec
+    - depguard
+
+linters-settings:
+  depguard:
+    rules:
+      prevent-vendor-import:
+        deny:
+          - pkg: "github.com/operator-framework/ansible-operator-plugins/vendor"
+            desc: "Do not import from vendor directory directly"
+      prevent-test-in-prod:
+        files:
+          - "!$test"
+          - "!**/test/**"
+        deny:
+          - pkg: "github.com/stretchr/testify"
+            desc: "testify is for tests only"
+  revive:
+    rules:
+      - name: exported
+        severity: warning
+      - name: blank-imports
+      - name: context-as-argument
+      - name: dot-imports
+      - name: error-return
+      - name: error-naming
+      - name: increment-decrement
+      - name: var-naming
+      - name: range
+      - name: receiver-naming
+
+issues:
+  exclude-dirs:
+    - vendor
+    - testdata
+    - openshift/vendor
+    - openshift/release
+  exclude-rules:
+    # Dot-importing ginkgo/gomega is the established, repo-wide test convention
+    # (16+ existing _test.go files, plus internal/testutils/ helpers, use this
+    # pattern). Not a real issue.
+    - path: "(_test\\.go$|^internal/testutils/)"
+      linters: [revive]
+      text: "^dot-imports:"
+    # pkg/testutils is a public API consumed by downstream projects (see AGENTS.md).
+    # Renaming exported symbols to satisfy naming/stutter conventions would be a
+    # breaking change; only unexported findings in this path get fixed for real.
+    - path: "^pkg/testutils/"
+      linters: [revive]
+      text: "^(exported|var-naming):"
+    # gosec is valuable on production controller/runner/proxy code but noisy on
+    # test helpers, codegen tooling, and e2e utilities where inputs are trusted.
+    - path: "^(hack/|pkg/testutils/|test/|internal/testutils/)"
+      linters: [gosec]

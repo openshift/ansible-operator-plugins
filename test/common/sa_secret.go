@@ -33,7 +33,7 @@ metadata:
 func GetSASecret(name string, dir string) (string, error) {
 	secretName := name + "-secret"
 	fileName := dir + "/" + secretName + ".yaml"
-	err := os.WriteFile(fileName, []byte(fmt.Sprintf(saSecretTemplate, secretName, name)), 0777)
+	err := os.WriteFile(fileName, []byte(fmt.Sprintf(saSecretTemplate, secretName, name)), 0600)
 	if err != nil {
 		return "", err
 	}

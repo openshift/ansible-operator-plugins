@@ -199,10 +199,12 @@ func convertMapKeys(fn func(string) string, in map[string]interface{}) map[strin
 	return converted
 }
 
+// MapToSnake recursively converts all map keys from camelCase to snake_case.
 func MapToSnake(in map[string]interface{}) map[string]interface{} {
 	return convertMapKeys(ToSnake, in)
 }
 
+// MapToCamel recursively converts all map keys from snake_case to camelCase.
 func MapToCamel(in map[string]interface{}) map[string]interface{} {
 	return convertMapKeys(ToCamel, in)
 }

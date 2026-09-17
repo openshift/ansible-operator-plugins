@@ -1,0 +1,30 @@
+# Semgrep: multi-rule static analysis (SAST) complementing CodeQL.
+# Uses the community "auto" ruleset, which covers Go security and
+# correctness patterns (no API token required).
+#
+# Runs directly on the host runner (not the semgrep/semgrep container image,
+# which defaults to root with no non-root USER) and installs a pinned
+# semgrep version via pip.
+name: Semgrep
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  semgrep:
+    name: Semgrep SAST scan
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Semgrep
+        run: pip install 'semgrep==1.176.1'
+      - name: Run Semgrep
+        run: semgrep scan --config=p/ci --config=p/golang --error --exclude vendor --exclude openshift/vendor --exclude testdata

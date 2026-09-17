@@ -1,3 +1,7 @@
+# Sanity workflow: runs on every PR.
+# Validates: formatting, generation, lint, vet, license headers,
+# error message format, and clean working tree.
+# Make target: make test-sanity (part of make verify / make test-static)
 name: sanity
 on:
   pull_request: {}
@@ -6,13 +10,19 @@ jobs:
   sanity:
     name: sanity
     runs-on: ubuntu-22.04
+    permissions:
+      contents: read
     steps:
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         fetch-depth: 0
-    - uses: actions/setup-go@v6
+        persist-credentials: false
+    - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
       with:
         go-version-file: "go.mod"
       id: go
     - run: sudo rm -rf /usr/local/bin/kustomize
-    - run: make test-sanity
+    - name: Type check
+      run: go vet ./...
+    - name: Run sanity checks
+      run: make test-sanity

@@ -221,6 +221,8 @@ func (meta *BundleMetaData) BuildBundleImage(tag string) error {
 		commandArg := strings.Split(meta.BuildCommand, " ")
 
 		// append the tag and build context to the command
+		// #nosec G204 -- commandArg comes from the operator author's own bundle metadata
+		// config, not external/network input.
 		cmd := exec.Command(commandArg[0], append(commandArg[1:], img)...)
 		output, err := cmd.CombinedOutput()
 		if err != nil || viper.GetBool(flags.VerboseOpt) {
@@ -265,8 +267,8 @@ func (meta *BundleMetaData) WriteScorecardConfig(inputConfigPath string) error {
 		return err
 	}
 
-	err = os.WriteFile(filepath.Join(scorecardDir, "config.yaml"), b, 0644)
-	if err != nil {
+	outPath := filepath.Join(scorecardDir, "config.yaml")
+	if err := os.WriteFile(outPath, b, 0600); err != nil {
 		return fmt.Errorf("error writing scorecard config %v", err)
 	}
 	return nil

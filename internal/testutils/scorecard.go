@@ -63,7 +63,7 @@ func (tc TestContext) AddScorecardCustomPatchFile() error {
 	// drop in the patch file
 	customScorecardPatchFile := filepath.Join(tc.Dir, "config", "scorecard", "patches", "custom.config.yaml")
 	patchBytes := []byte(customScorecardPatch)
-	err := os.WriteFile(customScorecardPatchFile, patchBytes, 0777)
+	err := os.WriteFile(customScorecardPatchFile, patchBytes, 0600)
 	if err != nil {
 		fmt.Printf("can not write %s %s\n", customScorecardPatchFile, err.Error())
 		return err

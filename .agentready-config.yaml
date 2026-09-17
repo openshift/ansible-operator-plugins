@@ -1,0 +1,7 @@
+# AgentReady configuration for ansible-operator-plugins
+# See https://github.com/ambient-code/agentready for documentation
+#
+# openapi_specs is excluded because this project has no public HTTP API surface.
+# See docs/decisions/adr-0004-openapi-not-applicable.md.
+excluded_attributes:
+  - openapi_specs

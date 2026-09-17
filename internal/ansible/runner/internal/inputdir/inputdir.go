@@ -55,6 +55,9 @@ func (i *InputDir) makeDirs() error {
 // addFile adds a file to the given relative path within the input directory.
 func (i *InputDir) addFile(path string, content []byte) error {
 	fullPath := filepath.Join(i.Path, path)
+	// #nosec G306 -- tracked in THREAT_MODEL.md mitigations (T11/T14); permissions
+	// of the runner input directory are an intentional, tracked open item and
+	// should not be tightened as an incidental side effect of a lint cleanup.
 	err := os.WriteFile(fullPath, content, 0644)
 	if err != nil {
 		log.Error(err, "Unable to write file", "Path", fullPath)
