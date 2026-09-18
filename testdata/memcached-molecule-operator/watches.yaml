@@ -4,6 +4,7 @@
   group: cache.example.com
   kind: Memcached
   playbook: playbooks/memcached.yml
+  markUnsafe: False
   finalizer:
     name: cache.example.com/finalizer
     role: memfin

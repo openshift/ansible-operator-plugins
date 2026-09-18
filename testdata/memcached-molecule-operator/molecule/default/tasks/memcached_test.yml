@@ -45,6 +45,10 @@
         delete: me
 
 
+- name: Verify markUnsafe mismatch ConfigMap was created
+  assert:
+    that: lookup('k8s', kind='ConfigMap', api_version='v1', namespace=namespace, resource_name='markunsafe-mismatch-test') is not none
+
 - name: Verify custom status exists
   assert:
     that: debug_cr.status.get("test") == "hello world"

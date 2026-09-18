@@ -7,3 +7,4 @@ metadata:
   name: memcached-sample
 spec:
   size: 1
+  environment: production
