@@ -2,7 +2,7 @@
 # It is built with dependencies that take a while to download, thus speeding
 # up ansible deploy jobs.
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.7 AS basebuilder
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.8 AS basebuilder
 
 # Install Rust so that we can ensure backwards compatibility with installing/building the cryptography wheel across all platforms
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -23,19 +23,20 @@ ENV PIP_NO_CACHE_DIR=1 \
 # and remove those not needed at runtime.
 RUN set -e && microdnf clean all && rm -rf /var/cache/dnf/* \
   && microdnf update -y \
-  && microdnf install -y gcc libffi-devel openssl-devel python3.12-devel \
+  && microdnf install -y gcc libffi-devel openssl-devel python3.12-devel which \
   && pushd /usr/local/bin && ln -sf ../../bin/python3.12 python3 && popd \
   && python3 -m ensurepip --upgrade \
-  && pip3 install --upgrade pip~=23.3.2 \
-  && pip3 install pipenv==2023.11.15 \
+  && pip3 install --upgrade pip~=26.1.2 \
+  && pip3 install pipenv==2026.6.2 pip-audit \
   && pipenv install --deploy \
   && pip3 install ansible_runner_http/ \
-  && pipenv check \
-  && microdnf remove -y gcc libffi-devel openssl-devel python3.12-devel \
+  && pipenv audit \
+  && pip3 uninstall -y pipenv pip-audit pip \
+  && microdnf remove -y gcc libffi-devel openssl-devel python3.12-devel which \
   && microdnf clean all \
   && rm -rf /var/cache/dnf
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.7 AS base
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.8 AS base
 ARG TARGETARCH
 
 # Label this image with the repo and commit that built it, for freshmaking purposes.

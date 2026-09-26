@@ -5,4 +5,4 @@ namespace: cloud
 server: https://galaxy.ansible.com/api/
 signatures: []
 version: 3.0.0
-version_url: /api/v3/plugin/ansible/content/published/collections/index/cloud/common/versions/3.0.0/
+version_url: /api/content/published/v3/plugin/ansible/content/published/collections/index/cloud/common/versions/3.0.0/
