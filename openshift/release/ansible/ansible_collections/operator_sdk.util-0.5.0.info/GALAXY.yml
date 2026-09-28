@@ -5,4 +5,4 @@ namespace: operator_sdk
 server: https://galaxy.ansible.com/api/
 signatures: []
 version: 0.5.0
-version_url: /api/v3/plugin/ansible/content/published/collections/index/operator_sdk/util/versions/0.5.0/
+version_url: /api/content/published/v3/plugin/ansible/content/published/collections/index/operator_sdk/util/versions/0.5.0/
