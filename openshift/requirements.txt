@@ -80,7 +80,7 @@ pyyaml==6.0.3
     # via
     #   -r requirements.in
     #   kubernetes
-requests==2.32.5
+requests==2.34.2
     # via
     #   -r requirements.in
     #   kubernetes
@@ -96,7 +96,7 @@ six==1.17.0
     #   -r requirements.in
     #   kubernetes
     #   python-dateutil
-urllib3==2.6.3
+urllib3==2.8.0
     # via
     #   -r requirements.in
     #   kubernetes
