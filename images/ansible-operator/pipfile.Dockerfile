@@ -23,11 +23,10 @@ RUN set -e && microdnf clean all && rm -rf /var/cache/dnf/* \
   && pip3 install --upgrade pip~=23.3.2 \
   && pip3 install pipenv==2023.11.15 \
   && pipenv lock \
-  # NOTE: These ignored vulnerabilities are detected in transitive dependencies
-  # but the upgraded versions don't support the use case or are not yet available.
+  # NOTE: This ignored vulnerability is detected in a transitive dependency
+  # but the upgraded version doesn't support the use case.
   # 90553: requests - upgraded version doesn't support the protocol we use.
-  # SFTY-20260511-47957, 96886: urllib3
-  && pipenv check --ignore 90553 --ignore SFTY-20260511-47957 --ignore 96886 \
+  && pipenv check --ignore 90553 \
   && microdnf remove -y gcc libffi-devel openssl-devel python3.12-devel \
   && microdnf clean all \
   && rm -rf /var/cache/dnf

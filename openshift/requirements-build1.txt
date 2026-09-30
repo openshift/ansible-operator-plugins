@@ -15,6 +15,7 @@ packaging==26.3
     #   -r requirements-build1.in
     #   hatchling
     #   setuptools-scm
+    #   vcs-versioning
 pathspec==1.1.1
     # via
     #   -r requirements-build1.in
@@ -23,7 +24,7 @@ pluggy==1.6.0
     # via
     #   -r requirements-build1.in
     #   hatchling
-setuptools-scm==9.2.2
+setuptools-scm==10.3.4
     # via
     #   -r requirements-build1.in
     #   hatch-vcs
@@ -35,6 +36,10 @@ trove-classifiers==2026.9.21.13
     # via
     #   -r requirements-build1.in
     #   hatchling
+vcs-versioning==2.5.0
+    # via
+    #   -r requirements-build1.in
+    #   setuptools-scm
 
 # The following packages are considered to be unsafe in a requirements file:
 setuptools==84.0.0

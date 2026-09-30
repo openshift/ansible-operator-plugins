@@ -13,11 +13,11 @@ certifi==2026.7.22
     # via
     #   -r requirements.in
     #   cryptography
-charset-normalizer==3.5.1
+charset-normalizer==3.5.2
     # via
     #   -r requirements.in
     #   requests
-#cryptography==50.0.1
+#cryptography==50.0.2
     # via
     #   -r requirements.in
     #   google-auth
@@ -25,7 +25,7 @@ durationpy==0.11
     # via
     #   -r requirements.in
     #   kubernetes
-google-auth==2.58.1
+google-auth==2.59.0
     # via
     #   -r requirements.in
     #   kubernetes
@@ -96,7 +96,7 @@ six==1.17.0
     #   -r requirements.in
     #   kubernetes
     #   python-dateutil
-urllib3==2.6.3
+urllib3==2.7.0
     # via
     #   -r requirements.in
     #   kubernetes
