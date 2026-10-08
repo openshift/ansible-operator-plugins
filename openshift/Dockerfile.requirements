@@ -28,7 +28,10 @@ ENV PIP_CONSTRAINT=/constraints.txt
 RUN python3 -m pip install pipenv==2023.11.15 \
     && python3 -m pip install pip-tools \
     && pipenv install --deploy \
-    && pipenv check \
+    # NOTE: This ignored vulnerability is detected in a transitive dependency
+    # but the upgraded version doesn't support the use case.
+    # 90553: requests - upgraded version doesn't support the protocol we use.
+    && pipenv check --ignore 90553 \
     && pipenv run pip freeze --all  > ./requirements.in \
     # NOTE: Comment out ansible-core, ansible-runner, and requests-unixsocket from
     # `requirements.in` to avoid dependency conflicts during pip-compile.
