@@ -8,9 +8,9 @@ calver==2025.10.20
     # via -r requirements-build.in
 changelog-chug==0.0.3
     # via -r requirements-build.in
-cython==3.2.4
+cython==3.3.0
     # via -r requirements-build.in
-docutils==0.22.4
+docutils==0.23
     # via
     #   -r requirements-build.in
     #   changelog-chug
@@ -18,43 +18,52 @@ flit-core==3.12.0
     # via -r requirements-build.in
 hatch-vcs==0.5.0
     # via -r requirements-build.in
-hatchling==1.29.0
+hatchling==1.32.4
     # via
     #   -r requirements-build.in
     #   hatch-vcs
-packaging==26.0
+packaging==26.3
     # via
     #   -r requirements-build.in
     #   hatchling
     #   setuptools-scm
+    #   vcs-versioning
     #   wheel
-pathspec==1.0.4
+pathspec==1.1.1
     # via
     #   -r requirements-build.in
     #   hatchling
-pbr==7.0.3
+pbr==7.1.3
     # via -r requirements-build.in
 pluggy==1.6.0
     # via
     #   -r requirements-build.in
     #   hatchling
-poetry-core==2.3.1
+poetry-core==2.5.0
     # via -r requirements-build.in
-semver==3.0.4
+semver==3.1.0
     # via
     #   -r requirements-build.in
     #   changelog-chug
-setuptools-scm==9.2.2
+setuptools-scm==10.3.4
     # via hatch-vcs
-trove-classifiers==2026.1.14.14
+tomlkit==0.15.1
     # via
     #   -r requirements-build.in
     #   hatchling
-wheel==0.46.3
+trove-classifiers==2026.9.21.13
+    # via
+    #   -r requirements-build.in
+    #   hatchling
+vcs-versioning==2.6.0
+    # via
+    #   -r requirements-build.in
+    #   setuptools-scm
+wheel==0.48.0
     # via -r requirements-build.in
 
 # The following packages are considered to be unsafe in a requirements file:
-setuptools==81.0.0
+setuptools==84.0.0
     # via
     #   -r requirements-build.in
     #   pbr
