@@ -23,10 +23,10 @@ RUN set -e && dnf clean all && rm -rf /var/cache/dnf/* \
   && pip3 install --upgrade pip~=23.3.2 \
   && pip3 install pipenv==2023.11.15 \
   && pipenv lock \
-  # NOTE: This ignored vulnerability (71064) was detected in requests, \
-  # but the upgraded version doesn't support the use case (protocol we are using).\
-  # Ref: https://github.com/operator-framework/ansible-operator-plugins/pull/67#issuecomment-2189164688
-  # && pipenv check --ignore 71064 \
+  # NOTE: This ignored vulnerability is detected in a transitive dependency
+  # but the upgraded version doesn't support the use case.
+  # 90553: requests - upgraded version doesn't support the protocol we use.
+  && pipenv check --ignore 90553 \
   && dnf remove -y gcc libffi-devel openssl-devel python3.12-devel \
   && dnf clean all \
   && rm -rf /var/cache/dnf
