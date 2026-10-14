@@ -4,32 +4,32 @@
 #
 #    pip-compile --output-file=./requirements.txt --strip-extras ./requirements.in
 #
-certifi==2026.2.25
+certifi==2026.7.22
     # via
     #   -r requirements.in
     #   kubernetes
     #   requests
-#cffi==2.0.0
+#cffi==2.1.1
     # via
     #   -r requirements.in
     #   cryptography
-charset-normalizer==3.4.4
+charset-normalizer==3.5.2
     # via
     #   -r requirements.in
     #   requests
-#cryptography==46.0.5
+#cryptography==50.0.2
     # via
     #   -r requirements.in
     #   google-auth
-durationpy==0.10
+durationpy==0.11
     # via
     #   -r requirements.in
     #   kubernetes
-google-auth==2.48.0
+google-auth==2.59.0
     # via
     #   -r requirements.in
     #   kubernetes
-idna==3.11
+idna==3.20
     # via
     #   -r requirements.in
     #   requests
@@ -45,12 +45,12 @@ markupsafe==3.0.3
     # via
     #   -r requirements.in
     #   jinja2
-oauthlib==3.3.1
+oauthlib==4.0.0
     # via
     #   -r requirements.in
     #   kubernetes
     #   requests-oauthlib
-packaging==26.0
+packaging==26.3
     # via -r requirements.in
 pexpect==4.9.0
     # via -r requirements.in
@@ -58,11 +58,10 @@ ptyprocess==0.7.0
     # via
     #   -r requirements.in
     #   pexpect
-pyasn1==0.6.2
+pyasn1==0.6.4
     # via
     #   -r requirements.in
     #   pyasn1-modules
-    #   rsa
 pyasn1-modules==0.4.2
     # via
     #   -r requirements.in
@@ -92,27 +91,23 @@ requests-oauthlib==2.0.0
     #   kubernetes
 resolvelib==1.0.1
     # via -r requirements.in
-rsa==4.9.1
-    # via
-    #   -r requirements.in
-    #   google-auth
 six==1.17.0
     # via
     #   -r requirements.in
     #   kubernetes
     #   python-dateutil
-urllib3==2.6.3
+urllib3==2.7.0
     # via
     #   -r requirements.in
     #   kubernetes
     #   requests
-websocket-client==1.9.0
+websocket-client==1.9.2
     # via
     #   -r requirements.in
     #   kubernetes
 
 # The following packages are considered to be unsafe in a requirements file:
 # pip
-ansible-core==2.18.14
-ansible-runner==2.4.2
+ansible-core==2.18.19
+ansible-runner==2.4.3
 requests-unixsocket==0.4.1
