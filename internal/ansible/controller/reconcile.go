@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
 	"os"
 	"strconv"
 	"strings"
@@ -75,7 +76,7 @@ func (r *AnsibleOperatorReconciler) Reconcile(ctx context.Context, request recon
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-	ident := strconv.FormatInt(time.Now().UnixNano(), 10)
+	ident := strconv.Itoa(rand.Int())
 	logger := logf.Log.WithName("reconciler").WithValues(
 		"job", ident,
 		"name", u.GetName(),

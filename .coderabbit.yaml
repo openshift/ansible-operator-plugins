@@ -1,10 +1,45 @@
-# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
-# See https://docs.coderabbit.ai/reference/configuration for all fields and default values
+inheritance: true
+language: en-US
+reviews:
+  profile: chill
+  high_level_summary: true
+  poem: false
+  collapse_walkthrough: false
+  request_changes_workflow: false
+  path_filters:
+    - "!vendor/**"
+    - "!openshift/vendor/**"
+    - "!testdata/**"
+    - "!openshift/release/ansible/ansible_collections/**"
+  path_instructions:
+    - path: "internal/ansible/controller/**"
+      instructions: >-
+        Check finalizer success/error ordering and the post-run uncached CR fetch.
+        Distinguish metadata Update from status Update (reconcile.go:232).
+    - path: "internal/ansible/proxy/**"
+      instructions: >-
+        Check owner-reference versus owner-annotation handling and request scoping.
+        Do not infer SSA semantics for all forwarded requests (inject_owner.go:143).
+    - path: "pkg/plugins/ansible/v1/**"
+      instructions: >-
+        Review template inputs together with regenerated sample output.
+        Keep runtime CLI and scaffolding plugin responsibilities distinct (plugin.go:34).
+    - path: "test/**"
+      instructions: >-
+        Check suite prerequisites and whether the change belongs in the Ansible or
+        molecule workflow. Do not assume envtest replaces kind (Makefile:142).
+    - path: "openshift/**"
+      instructions: >-
+        Review downstream dependency/image inputs in their own module/build context.
+        Use the public sync and requirements guides before prescribing regeneration.
+  auto_review:
+    enabled: true
+    drafts: false
 knowledge_base:
   code_guidelines:
+    enabled: true
     filePatterns:
-      - "docs/domain/*.md"
-      - "docs/architecture/*.md"
-      - "docs/references/*.md"
-      - "docs/AOP_DEVELOPMENT.md"
-      - "docs/AOP_TESTING.md"
+      - "REVIEW.md"
+      - "AGENTS.md"
+  learnings:
+    scope: local

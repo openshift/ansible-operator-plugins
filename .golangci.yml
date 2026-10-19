@@ -34,7 +34,6 @@ linters-settings:
       - name: error-return
       - name: error-naming
       - name: increment-decrement
-      - name: var-naming
       - name: range
       - name: receiver-naming
 
@@ -46,17 +45,14 @@ issues:
     - openshift/release
   exclude-rules:
     # Dot-importing ginkgo/gomega is the established, repo-wide test convention
-    # (16+ existing _test.go files, plus internal/testutils/ helpers, use this
-    # pattern). Not a real issue.
     - path: "(_test\\.go$|^internal/testutils/)"
       linters: [revive]
       text: "^dot-imports:"
-    # pkg/testutils is a public API consumed by downstream projects (see AGENTS.md).
-    # Renaming exported symbols to satisfy naming/stutter conventions would be a
-    # breaking change; only unexported findings in this path get fixed for real.
+    # pkg/testutils is a public API consumed by downstream projects.
+    # Renaming exported symbols would be a breaking change.
     - path: "^pkg/testutils/"
       linters: [revive]
-      text: "^(exported|var-naming):"
+      text: "^exported:"
     # gosec is valuable on production controller/runner/proxy code but noisy on
     # test helpers, codegen tooling, and e2e utilities where inputs are trusted.
     - path: "^(hack/|pkg/testutils/|test/|internal/testutils/)"

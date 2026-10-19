@@ -23,8 +23,8 @@ type KubernetesVersion interface {
 	ServerVersion() VersionInfo
 }
 
-// kubeVersionInfoJSON is a struct that allows for easier parsing of the JSON version information from something like `kubectl version`
-type kubeVersionInfoJSON struct {
+// kubeVersionInfoJson is a struct that allows for easier parsing of the JSON version information from something like `kubectl version`
+type kubeVersionInfoJson struct {
 	Major      string `json:"major"`
 	Minor      string `json:"minor"`
 	GitVersion string `json:"gitVersion"`
@@ -32,14 +32,14 @@ type kubeVersionInfoJSON struct {
 
 // KubeVersionInfo is an implementation of the VersionInfo interface
 type KubeVersionInfo struct {
-	kubeVersionInfoJSON
+	kubeVersionInfoJson
 }
 
 // NewKubeVersionInfo will return a KubeVersionInfo from a given JSON string
 func NewKubeVersionInfo(out string) (*KubeVersionInfo, error) {
 	kvi := &KubeVersionInfo{}
 	dec := json.NewDecoder(strings.NewReader(out))
-	if err := dec.Decode(&kvi.kubeVersionInfoJSON); err != nil {
+	if err := dec.Decode(&kvi.kubeVersionInfoJson); err != nil {
 		return nil, err
 	}
 
@@ -48,17 +48,17 @@ func NewKubeVersionInfo(out string) (*KubeVersionInfo, error) {
 
 // Major returns the string representation of the Major version
 func (kvi *KubeVersionInfo) Major() string {
-	return kvi.kubeVersionInfoJSON.Major
+	return kvi.kubeVersionInfoJson.Major
 }
 
 // Minor returns the string representatiion of the Minor version
 func (kvi *KubeVersionInfo) Minor() string {
-	return kvi.kubeVersionInfoJSON.Minor
+	return kvi.kubeVersionInfoJson.Minor
 }
 
 // GitVersion returns the string representation of the GitVersion
 func (kvi *KubeVersionInfo) GitVersion() string {
-	return kvi.kubeVersionInfoJSON.GitVersion
+	return kvi.kubeVersionInfoJson.GitVersion
 }
 
 // KubeVersion is an implementation of the KubernetesVersion interface
@@ -74,7 +74,7 @@ type KubeVersionOptions func(kv *KubeVersion)
 func WithClientVersion(clientVersion VersionInfo) KubeVersionOptions {
 	return func(kv *KubeVersion) {
 		kv.clientVersion = KubeVersionInfo{
-			kubeVersionInfoJSON: kubeVersionInfoJSON{
+			kubeVersionInfoJson: kubeVersionInfoJson{
 				Major:      clientVersion.Major(),
 				Minor:      clientVersion.Minor(),
 				GitVersion: clientVersion.GitVersion(),
@@ -87,7 +87,7 @@ func WithClientVersion(clientVersion VersionInfo) KubeVersionOptions {
 func WithServerVersion(serverVersion VersionInfo) KubeVersionOptions {
 	return func(kv *KubeVersion) {
 		kv.serverVersion = KubeVersionInfo{
-			kubeVersionInfoJSON: kubeVersionInfoJSON{
+			kubeVersionInfoJson: kubeVersionInfoJson{
 				Major:      serverVersion.Major(),
 				Minor:      serverVersion.Minor(),
 				GitVersion: serverVersion.GitVersion(),

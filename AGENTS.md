@@ -1,49 +1,37 @@
-# Ansible Operator Plugins - Agentic Documentation
+# Ansible Operator Plugins
 
-**Component**: Ansible Operator Plugins (AOP)
-**Repository**: openshift/ansible-operator-plugins (downstream mirror of operator-framework/ansible-operator-plugins)
+| Field | Value |
+|---|---|
+| Repository | https://github.com/openshift/ansible-operator-plugins |
+| Development branch | `main` |
+| Go module | `github.com/operator-framework/ansible-operator-plugins` (`go.mod:1`) |
 
-> **AI agents**: Read `docs/domain/` first for API contracts and watches.yaml schema,
-> then `docs/architecture/` for reconcile/runner/proxy implementation patterns.
-> Check `docs/decisions/` before making architectural changes.
+## Purpose
 
-## What is Ansible Operator Plugins?
+Ansible operator runtime and Kubebuilder scaffolding plugin, with OpenShift base-image build artifacts.
+Start with [the overview](README.md) and [downstream build/sync guidance](openshift/README.md).
 
-A Go library and binary that bridges Ansible automation with Kubernetes controllers via controller-runtime. Part of the Operator SDK ecosystem, consumed as a standalone `ansible-operator` binary and as a library by downstream projects (notably the OpenShift fork under `openshift/`).
+## Critical Warnings
 
-**Core loop**: a `watches.yaml` file maps Kubernetes GVKs to Ansible playbooks or roles. For each watch entry, a controller-runtime controller is created. On reconcile, the controller shells out to `ansible-runner`, consumes job events via a Unix-domain-socket HTTP API, and updates the CR's status conditions.
+- Never hand-edit generated `testdata/`; change scaffolds/generators and use `make generate` (`Makefile:52`).
+- Never run `make clean` casually: its removal command targets `BUILD_DIR`, whose default is `.` (`Makefile:18`, `Makefile:68`).
+- Never assume all writes use server-side apply: CR metadata/status use Update; Ansible requests pass through a proxy (`internal/ansible/controller/reconcile.go:112`, `internal/ansible/proxy/proxy.go:96`).
+- Never collapse the two Go modules: downstream dependencies live under `openshift/` (`openshift/README.md:20`).
+- Do not change the proxy bind address from localhost. The proxy has no authentication of its own.
+- Do not remove either `Authorization` header stripping call in the proxy handler chain. Both are required.
+- Do not use `sync.Map` -- the codebase uses `sync.RWMutex` exclusively for concurrent data structures.
+- Do not type-check a single Go file independently of its package. Always lint and test at the package level.
+- Do not run E2E tests without Docker and Kind. E2E creates a cluster and builds images.
 
-## Core Components
+## Architecture at a Glance
 
-| Component | Location | Purpose |
-|---|---|---|
-| Controller | `internal/ansible/controller/` | Controller setup, reconcile loop, status conditions |
-| Runner | `internal/ansible/runner/` | ansible-runner subprocess management, event API |
-| Proxy | `internal/ansible/proxy/` | REST proxy intercepting Ansible's K8s API calls |
-| Watches | `internal/ansible/watches/` | watches.yaml loading and validation |
-| Metrics | `internal/ansible/metrics/`, `internal/ansible/apiserver/` | Prometheus metrics, user-metric API (port 5050) |
-| Plugin/Scaffold | `pkg/plugins/ansible/v1/` | Kubebuilder plugin: scaffolding templates |
-| Test utilities | `pkg/testutils/` | Public E2E helpers (Kind, kubectl, operator lifecycle) |
-| Downstream | `openshift/` | OpenShift fork overlay (separate go.mod, vendor, Makefile) |
-| Testdata | `testdata/` | Generated sample operator projects (do not hand-edit) |
-
-## Critical Patterns
-
-1. **DO NOT hand-edit** `testdata/`, `vendor/`, or generated scaffold output. Run `make generate` after scaffold/plugin changes; run `go mod tidy && go mod vendor` after dependency changes.
-2. **DO NOT type-check a single Go file independently** of its package. Always lint and test at the package level: `go test ./internal/ansible/controller/`.
-3. **DO NOT run E2E tests** without Docker and Kind. E2E creates a cluster and builds images.
-4. **DO NOT change the proxy bind address** from localhost. The proxy has no authentication of its own.
-5. **DO NOT remove either `Authorization` header stripping call** in the proxy handler chain. Both are required.
-6. **DO NOT use `sync.Map`** -- the codebase uses `sync.RWMutex` exclusively for concurrent data structures.
-
-## Design Rationale (selected)
-
-- `openshift/` uses a separate `go.mod` and vendor tree instead of a Go
-  workspace, because downstream CVE backports and release cadence must not
-  block on upstream merges (`docs/decisions/adr-0001-upstream-downstream-mirror.md`).
-- Ansible job events are consumed over a Unix-domain-socket HTTP API rather
-  than parsed from stdout, because structured JSON events are the only
-  reliable way to drive status conditions (`docs/architecture/components.md`).
+| Surface | Start here |
+|---|---|
+| Runtime startup | `internal/cmd/ansible-operator/run/cmd.go:95` |
+| Watch configuration | `internal/ansible/watches/watches.go:313` |
+| CR reconciliation | `internal/ansible/controller/reconcile.go:68` |
+| Ansible execution | `internal/ansible/runner/runner.go:182` |
+| Scaffolding plugin | `pkg/plugins/ansible/v1/plugin.go:25` |
 
 ## Single-File Verification
 
@@ -57,34 +45,6 @@ Go is type-checked at the **package** level. Always validate the enclosing packa
 | Format | `go fmt ./internal/ansible/controller/` |
 | Shell check | `shellcheck path/to/script.sh` |
 | YAML lint | `yamllint path/to/file.yaml` |
-
-## Documentation Structure
-
-```text
-docs/
-├── domain/
-│   ├── watches-and-contracts.md     # watches.yaml schema, status conditions, annotations, ports
-│   └── generated-artifacts.md       # testdata, vendor, scaffold output rules
-├── architecture/
-│   ├── components.md                # Reconcile flow, runner, proxy, event handlers, metrics
-│   ├── error-handling.md            # Reconciler error contract, status marking, HTTP errors
-│   ├── performance.md               # Channel buffering, concurrency, mutexes, goroutines
-│   └── boundaries.md                # Package visibility, dependency direction
-├── decisions/
-│   ├── adr-0001-upstream-downstream-mirror.md
-│   ├── adr-0002-generated-vendor-artifact-policy.md
-│   ├── adr-0003-release-rebase-workflow.md
-│   ├── adr-0004-openapi-not-applicable.md
-│   └── adr-template.md
-├── references/
-│   ├── ecosystem.md                 # Links to operator-sdk, enhancements, platform patterns
-│   ├── downstream-sync.md           # UPSTREAM: carry/drop, rebase workflow, openshift/ targets
-│   └── security.md                  # Proxy auth, kubeconfig, RBAC, input validation, file perms
-├── AOP_DEVELOPMENT.md               # Build, setup, verify, validation matrix, common mistakes
-└── AOP_TESTING.md                   # Ginkgo/testify conventions, envtest, E2E, short mode
-```
-
-**AI Agent Path**: `docs/domain/` → `docs/architecture/` → `docs/decisions/` → `docs/AOP_DEVELOPMENT.md` or `docs/AOP_TESTING.md` (as relevant)
 
 ## Quick Reference
 
@@ -102,6 +62,28 @@ docs/
 
 **Framework**: controller-runtime v0.21.0 | **Go**: 1.26.3 | **Module**: `github.com/operator-framework/ansible-operator-plugins`
 
+## Documentation Structure
+
+```text
+AGENTS.md / CLAUDE.md   Entry point (CLAUDE.md is a symlink)
+REVIEW.md               Diff-oriented review rules
+ai-docs/ARCHITECTURE.md Runtime contracts and source map
+ai-docs/DEVELOPMENT.md  Build, generation, and downstream work
+ai-docs/TESTING.md       Test commands, suites, and prerequisites
+ai-docs/ENHANCEMENTS.md Historical design reference catalog
+docs/decisions/          Architecture Decision Records (4 ADRs)
+docs/patterns/README.md  Pattern index for common changes
+```
+
+## Key Files and Task Routing
+
+- [Architecture and behavioral contracts](ai-docs/ARCHITECTURE.md): start here for runtime changes.
+- [Development](ai-docs/DEVELOPMENT.md): generators, safe commands, CI, and release references.
+- [Testing](ai-docs/TESTING.md): select checks before running cluster-dependent suites.
+- [Review guidance](REVIEW.md): severity, evidence, and path-specific rules.
+- [Design catalog](ai-docs/ENHANCEMENTS.md): historical proposal, not a current support commitment.
+- [Requirements generation](openshift/hack/generate_requirements.md): downstream Python dependency workflow.
+
 ## Pattern References
 
 - **New GVK watch**: follow the pattern in `internal/ansible/watches/watches.go` and `testdata/memcached-molecule-operator/watches.yaml`
@@ -110,32 +92,11 @@ docs/
 - **Go dependency update**: see `go.mod` and `go.sum` as reference; run `go mod tidy && go mod vendor`, then `make verify`
 - **Downstream carry patch**: follow the pattern in `openshift/Makefile` and `openshift/hack/rebase_upstream.sh`; prefix commits with `UPSTREAM: <carry>:`
 
-See `docs/patterns/README.md` for the full pattern index and `examples/` for a runnable sample operator.
-
-## Knowledge Graph
-
-```text
-                       [AGENTS.md] ← Start here
-                            │
-            ┌───────────────┼───────────────┐
-            │               │               │
-  [docs/domain/]    [docs/architecture/]  [docs/decisions/]
-   watches.yaml       Reconcile flow        ADR history
-   API contracts      Runner/Proxy          (4 ADRs)
-   Generated files    Error handling
-            │               │               │
-            └───────────────┼───────────────┘
-                            │
-              [docs/AOP_DEVELOPMENT.md]
-              [docs/AOP_TESTING.md]
-                            │
-              [docs/references/]
-                 Ecosystem links
-                 Downstream sync
-                 Security rules
-```
+See `docs/patterns/README.md` for the full pattern index.
 
 ## External References
 
+- [Platform development guidance](https://github.com/openshift/enhancements/tree/master/dev-guide) is shared context, not proof of local implementation.
+- [Platform conventions](https://github.com/openshift/enhancements/blob/master/CONVENTIONS.md); this repository uses `main`, not the historical branch example there.
 - [openshift/README.md](openshift/README.md) -- downstream sync walkthrough
 - [images/ansible-operator/README.md](images/ansible-operator/README.md) -- container image and Python conventions

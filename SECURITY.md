@@ -50,7 +50,6 @@ dependencies and common code security issues before merge:
 - **CodeQL** (`.github/workflows/codeql.yml`) — static application security
   testing (SAST) for Go
 - **Semgrep** (`.github/workflows/semgrep.yml`) — multi-rule SAST
-- **detect-secrets** (`.pre-commit-config.yaml`) — pre-commit secret scanning
 
 ## Disclosure Process
 
