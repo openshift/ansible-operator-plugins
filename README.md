@@ -1,6 +1,8 @@
 # Ansible Operator Plugins
 
-A plugin that provide Ansible-based operator functionality for the [Operator SDK](https://github.com/operator-framework/operator-sdk). This project contains the core Ansible operator implementation that enables developers to build Kubernetes operators using Ansible playbooks and roles.
+[![sanity](https://github.com/openshift/ansible-operator-plugins/actions/workflows/test-sanity.yml/badge.svg)](https://github.com/openshift/ansible-operator-plugins/actions/workflows/test-sanity.yml) [![unit](https://github.com/openshift/ansible-operator-plugins/actions/workflows/unit.yml/badge.svg)](https://github.com/openshift/ansible-operator-plugins/actions/workflows/unit.yml)
+
+A plugin that provides Ansible-based operator functionality for the [Operator SDK](https://github.com/operator-framework/operator-sdk). This project contains the core Ansible operator implementation that enables developers to build Kubernetes operators using Ansible playbooks and roles.
 
 ## Overview
 
@@ -8,7 +10,122 @@ This project provides the Ansible plugin for Operator SDK, allowing you to:
 - Build Kubernetes operators using Ansible playbooks and roles
 - Manage custom resources with Ansible automation
 - Handle operator lifecycle events through Ansible tasks
-- Leverage the full ecosystem of Ansible modules and collections 
+- Leverage the full ecosystem of Ansible modules and collections
+
+## Tech Stack
+
+| Component | Version / Details |
+|---|---|
+| Go | 1.26.3 |
+| Module path | `github.com/operator-framework/ansible-operator-plugins` |
+| Kubernetes libs | k8s.io v0.33.x (`client-go`, `apimachinery`, `api`) |
+| Controller framework | [controller-runtime](https://pkg.go.dev/sigs.k8s.io/controller-runtime) v0.21.0 |
+| Scaffolding framework | [kubebuilder](https://pkg.go.dev/sigs.k8s.io/kubebuilder/v4) v4.6.0 |
+| Operator utilities | [operator-lib](https://github.com/operator-framework/operator-lib) v0.19.0 |
+| Metrics | [prometheus/client_golang](https://github.com/prometheus/client_golang) v1.23.2 |
+| CLI | cobra v1.10.2, pflag, viper |
+| Testing | Ginkgo v2 / Gomega, testify, envtest |
+| Tool management | [bingo](https://github.com/bwplotka/bingo) (golangci-lint, goreleaser, kind, setup-envtest) |
+| Container image | `quay.io/operator-framework/ansible-operator` |
+
+## Project Structure
+
+```
+cmd/ansible-operator/           Single binary entrypoint (cobra CLI)
+internal/
+  ansible/
+    controller/                 Controller setup + reconcile loop
+    runner/                     ansible-runner subprocess management
+    proxy/                      REST proxy intercepting Ansible's K8s API calls
+    watches/                    watches.yaml loading and validation
+    events/                     Ansible event logging
+    metrics/                    Prometheus metric definitions
+    apiserver/                  Metrics API server (localhost:5050)
+  cmd/ansible-operator/run/     "run" subcommand (manager setup, proxy start)
+  version/                      Build-time version variables (ldflags)
+pkg/
+  plugins/ansible/v1/           Kubebuilder plugin: scaffolding templates
+  testutils/                    Public E2E test utilities
+hack/                           Scripts for generation, linting, license checks
+images/ansible-operator/        Dockerfile + Pipfile for operator image
+openshift/                      Downstream OpenShift fork overlay
+testdata/                       Generated sample operator projects (do not hand-edit)
+```
+
+## Building and Testing
+
+```sh
+# Bootstrap dev tools (idempotent, no cluster creation)
+make setup
+
+# Build the ansible-operator binary
+make build
+
+# Full non-cluster validation (sanity + unit)
+make verify
+
+# Unit tests only (uses envtest, skips E2E)
+make test-unit
+
+# Sanity checks: formatting, linting, vet, license headers, error message format
+make test-sanity
+
+# Full E2E suite (creates a Kind cluster, builds images)
+make test-e2e
+
+# Ansible-specific E2E only
+make test-e2e-ansible
+
+# Auto-fix: go mod tidy + go fmt + golangci-lint --fix
+make fix
+
+# Regenerate testdata after scaffold template changes
+make generate
+```
+
+Cross-compile by setting `BUILD_GOOS` and `BUILD_GOARCH`:
+
+```sh
+BUILD_GOOS=linux BUILD_GOARCH=arm64 make build
+```
+
+Build the Docker image:
+
+```sh
+make image-build
+```
+
+### Vendoring
+
+This project vendors all dependencies. After modifying `go.mod`:
+
+```sh
+go mod tidy
+go mod vendor
+```
+
+Commit the updated `vendor/` directory. The `make test-sanity` target will fail if the working tree is dirty after generation.
+
+## Upstream/Downstream Synchronization
+
+The `openshift/` directory contains an independent build overlay for the OpenShift downstream fork. See [openshift/README.md](openshift/README.md) for the rebase walkthrough and [docs/references/downstream-sync.md](docs/references/downstream-sync.md) for the `UPSTREAM: <carry|drop>:` commit convention.
+
+## Further Documentation
+
+| Document | Description |
+|---|---|
+| [AGENTS.md](AGENTS.md) | Component overview, AI agent routing, critical patterns |
+| [docs/domain/](docs/domain/) | watches.yaml schema, API contracts, generated artifact rules |
+| [docs/architecture/](docs/architecture/) | Reconcile flow, runner, proxy, error handling, performance |
+| [docs/decisions/](docs/decisions/) | ADRs for upstream/downstream, vendor policy, release workflow |
+| [docs/AOP_DEVELOPMENT.md](docs/AOP_DEVELOPMENT.md) | Build, validation matrix, code conventions, common mistakes |
+| [docs/AOP_TESTING.md](docs/AOP_TESTING.md) | Ginkgo/testify conventions, envtest, E2E infrastructure |
+| [docs/references/](docs/references/) | Ecosystem links, downstream sync, security rules |
+| [THREAT_MODEL.md](THREAT_MODEL.md) | Trust boundaries and threat analysis (draft) |
+
+## Security
+
+For security vulnerabilities, please see [THREAT_MODEL.md](THREAT_MODEL.md) for the trust boundary analysis and [docs/references/security.md](docs/references/security.md) for codebase security conventions.
 
 # Releasing Guide
 

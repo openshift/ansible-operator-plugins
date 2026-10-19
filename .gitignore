@@ -129,5 +129,27 @@ tags
 
 # End of https://www.toptal.com/developers/gitignore/api/go,vim,emacs,visualstudiocode
 
-# Python cache (Ansible molecule)
+# Python cache and test artifacts (Ansible molecule)
 test/ansible/plugins/filter/__pycache__/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.venv/
+htmlcov/
+.coverage
+*.egg-info/
+
+# Additional coverage and artifact patterns
+*.swp
+*.swo
+.env
+.env.*
+cover.out
+coverage.txt
+*.log
+tmp/
+
+# Go workspace file
+go.work
+go.work.sum

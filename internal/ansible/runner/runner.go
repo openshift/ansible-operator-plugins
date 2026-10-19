@@ -85,6 +85,8 @@ func playbookCmdFunc(path string) cmdFuncType {
 		if verbosity > 0 {
 			cmdOptions = append(cmdOptions, ansibleVerbosityString(verbosity))
 		}
+		// #nosec G204 -- ansible-runner is a fixed binary name; args are built from
+		// the operator's own watches.yaml configuration, not external/network input.
 		return exec.Command("ansible-runner", append(cmdArgs, cmdOptions...)...)
 	}
 }
@@ -113,6 +115,8 @@ func roleCmdFunc(path string) cmdFuncType {
 		if ansibleGathering == "explicit" {
 			cmdOptions = append(cmdOptions, "--role-skip-facts")
 		}
+		// #nosec G204 -- ansible-runner is a fixed binary name; args are built from
+		// the operator's own watches.yaml configuration, not external/network input.
 		return exec.Command("ansible-runner", append(cmdArgs, cmdOptions...)...)
 	}
 }
@@ -179,6 +183,7 @@ type runner struct {
 	ansibleArgs         string
 }
 
+// Run executes an ansible-runner process for the given CR and returns its result.
 func (r *runner) Run(ident string, u *unstructured.Unstructured, kubeconfig string) (RunResult, error) {
 	if _, err := exec.LookPath(ansibleRunnerBin); err != nil {
 		return nil, err
@@ -422,6 +427,7 @@ func escapeAnsibleKey(key string) string {
 	return key
 }
 
+// GetFinalizer returns the configured finalizer name and whether one is set.
 func (r *runner) GetFinalizer() (string, bool) {
 	if r.Finalizer != nil {
 		return r.Finalizer.Name, true

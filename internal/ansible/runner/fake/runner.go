@@ -44,10 +44,12 @@ type runResult struct {
 	stdout string
 }
 
+// Events returns the channel of job events for this fake run result.
 func (r *runResult) Events() <-chan eventapi.JobEvent {
 	return r.events
 }
 
+// Stdout returns the captured standard output of the fake run.
 func (r *runResult) Stdout() (string, error) {
 	if r.stdout != "" {
 		return r.stdout, nil

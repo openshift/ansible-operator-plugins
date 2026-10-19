@@ -90,6 +90,7 @@ var namespaceSubresources = set.New("status", "finalize")
 // pkg/master/master_test.go, so we never drift
 var NamespaceSubResourcesForTest = set.New(namespaceSubresources.SortedList()...)
 
+// RequestInfoFactory resolves Kubernetes API request metadata from HTTP requests.
 type RequestInfoFactory struct {
 	APIPrefixes          set.Set[string] // without leading and trailing slashes
 	GrouplessAPIPrefixes set.Set[string] // without leading and trailing slashes
@@ -126,7 +127,8 @@ type RequestInfoFactory struct {
 // /api/{version}
 // /api
 // /healthz
-
+//
+// NewRequestInfo returns the information from the http request.
 func (r *RequestInfoFactory) NewRequestInfo(req *http.Request) (*RequestInfo, error) { //nolint:gocyclo
 	// TODO: Try to reduce the complexity of this last measured at 33 (failing at > 30) and remove the // nolint:gocyclo
 	// start with a non-resource request until proven otherwise
