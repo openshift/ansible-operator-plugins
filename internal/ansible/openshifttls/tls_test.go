@@ -17,6 +17,7 @@ package openshifttls
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"testing"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -25,6 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apimachruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/rest"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -38,62 +40,92 @@ func newFakeClientWithScheme(objs ...ctrlclient.Object) ctrlclient.Client {
 	return fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
 }
 
-func TestDefaultProfile(t *testing.T) {
-	got := defaultProfile()
-	want, err := tlspkg.GetTLSProfileSpec(nil)
-	require.NoError(t, err)
-	assert.Equal(t, want, got)
-	assert.Equal(t, configv1.TLSProfiles[configv1.TLSProfileIntermediateType].MinTLSVersion, got.MinTLSVersion)
-}
-
-func TestFetchProfile_NilClientFallsBackToDefault(t *testing.T) {
-	got := fetchProfile(context.Background(), nil)
-	assert.Equal(t, defaultProfile(), got)
-}
-
-func TestFetchProfile_APIServerNotFoundFallsBackToDefault(t *testing.T) {
-	// No "cluster" APIServer object exists in the fake client, simulating
-	// either a non-OpenShift cluster or the CRD not being installed.
-	client := newFakeClientWithScheme()
-
-	got := fetchProfile(context.Background(), client)
-	assert.Equal(t, defaultProfile(), got)
-}
-
-func TestFetchProfile_ReturnsConfiguredProfile(t *testing.T) {
-	apiServer := &configv1.APIServer{
+func newFakeAPIServer(profileType configv1.TLSProfileType) *configv1.APIServer {
+	return &configv1.APIServer{
 		ObjectMeta: metav1.ObjectMeta{Name: tlspkg.APIServerName},
 		Spec: configv1.APIServerSpec{
-			TLSSecurityProfile: &configv1.TLSSecurityProfile{
-				Type: configv1.TLSProfileModernType,
-			},
+			TLSSecurityProfile: &configv1.TLSSecurityProfile{Type: profileType},
 		},
 	}
-	client := newFakeClientWithScheme(apiServer)
-
-	got := fetchProfile(context.Background(), client)
-	assert.Equal(t, *configv1.TLSProfiles[configv1.TLSProfileModernType], got)
-	assert.NotEqual(t, defaultProfile(), got, "Modern profile must differ from the Intermediate default used in this test")
 }
 
-func TestClusterTLSPolicy_ApplyAppendsMetricsTLSOpts(t *testing.T) {
-	p := &clusterTLSPolicy{}
+func TestClusterTLSPolicy_Apply(t *testing.T) {
+	testCases := []struct {
+		name                       string
+		apiServer                  *configv1.APIServer
+		wantMinVersion             uint16
+		wantCipherSuites           bool
+		wantProfileSourceAvailable bool
+	}{
+		{
+			name:                       "Modern profile",
+			apiServer:                  newFakeAPIServer(configv1.TLSProfileModernType),
+			wantMinVersion:             tls.VersionTLS13,
+			wantCipherSuites:           false,
+			wantProfileSourceAvailable: true,
+		},
+		{
+			name:                       "Intermediate profile",
+			apiServer:                  newFakeAPIServer(configv1.TLSProfileIntermediateType),
+			wantMinVersion:             tls.VersionTLS12,
+			wantCipherSuites:           true,
+			wantProfileSourceAvailable: true,
+		},
+		{
+			name:                       "missing APIServer object falls back to default",
+			apiServer:                  nil,
+			wantMinVersion:             tls.VersionTLS12,
+			wantCipherSuites:           true,
+			wantProfileSourceAvailable: false,
+		},
+	}
 
-	// Apply builds its own client from *rest.Config, which requires a real
-	// (or at least non-empty) cluster connection outside the scope of this
-	// unit test; exercise the same code path fetchProfile/Apply relies on
-	// directly instead, then assert the manager.Options mutation contract.
-	profile := *configv1.TLSProfiles[configv1.TLSProfileModernType]
-	p.initialProfile = profile
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var objs []ctrlclient.Object
+			if tc.apiServer != nil {
+				objs = append(objs, tc.apiServer)
+			}
+			fakeC := newFakeClientWithScheme(objs...)
 
-	tlsConfigFunc, unsupported := tlspkg.NewTLSConfigFromProfile(profile)
-	assert.Empty(t, unsupported)
+			p := &clusterTLSPolicy{
+				fakeClient: func(_ *rest.Config, _ ctrlclient.Options) (ctrlclient.Client, error) {
+					return fakeC, nil
+				},
+			}
 
-	var options manager.Options
-	options.Metrics.TLSOpts = append(options.Metrics.TLSOpts, tlsConfigFunc)
+			options, err := p.Apply(context.Background(), &rest.Config{}, manager.Options{})
+			require.NoError(t, err)
+			require.Len(t, options.Metrics.TLSOpts, 1)
+			assert.Equal(t, tc.wantProfileSourceAvailable, p.profileSourceAvailable)
 
-	require.Len(t, options.Metrics.TLSOpts, 1)
-	cfg := &tls.Config{} //nolint:gosec // test-only, not used for a real connection
-	options.Metrics.TLSOpts[0](cfg)
-	assert.Equal(t, uint16(tls.VersionTLS13), cfg.MinVersion)
+			cfg := &tls.Config{} //nolint:gosec // test-only, not used for a real connection
+			options.Metrics.TLSOpts[0](cfg)
+			assert.Equal(t, tc.wantMinVersion, cfg.MinVersion)
+			if tc.wantCipherSuites {
+				assert.NotEmpty(t, cfg.CipherSuites)
+			} else {
+				assert.Empty(t, cfg.CipherSuites)
+			}
+		})
+	}
+}
+
+func TestClusterTLSPolicy_Apply_ClientConstructionFailureReturnsError(t *testing.T) {
+	wantErr := errors.New("boom")
+	p := &clusterTLSPolicy{
+		fakeClient: func(_ *rest.Config, _ ctrlclient.Options) (ctrlclient.Client, error) {
+			return nil, wantErr
+		},
+	}
+
+	options, err := p.Apply(context.Background(), &rest.Config{}, manager.Options{})
+	assert.ErrorIs(t, err, wantErr)
+	assert.Empty(t, options.Metrics.TLSOpts)
+}
+
+func TestClusterTLSPolicy_Watch_SkipsWhenProfileSourceUnavailable(t *testing.T) {
+	p := &clusterTLSPolicy{profileSourceAvailable: false}
+	err := p.WatchIfProfileAvailable(context.Background(), nil, func() {})
+	assert.NoError(t, err)
 }

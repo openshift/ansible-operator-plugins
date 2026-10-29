@@ -151,9 +151,9 @@ EOF
 deploy_operator() {
     echo "Creating temporary copy of test operator to avoid modifying synced upstream files"
     TESTDIR="$(mktemp -d)"
-    trap_add "rm -rf $TESTDIR" EXIT
-    cp -r $ROOTDIR/testdata/memcached-molecule-operator $TESTDIR/
-    pushd $TESTDIR/memcached-molecule-operator
+    trap_add "rm -rf -- '$TESTDIR'" EXIT
+    cp -r "$ROOTDIR/testdata/memcached-molecule-operator" "$TESTDIR/"
+    pushd "$TESTDIR/memcached-molecule-operator"
     ls
 
     # Pre-configure deployment memory limit to avoid pod restart after deployment
@@ -184,7 +184,7 @@ EOF
 
     # deploy operator
     echo "running make deploy"
-    make deploy IMG=$IMAGE
+    make deploy IMG="$IMAGE"
 
     # Hack: Add missing RBAC permission for operations related to `project.openshift.io`
     # This is required for the Ansible Task: `create project if projects are available`

@@ -181,8 +181,8 @@ func run(cmd *cobra.Command, f *flags.Flags) {
 	// at runtime (e.g. cancelling ctx to trigger a graceful restart). No-op
 	// when nothing is registered.
 	if registeredTLSPolicy != nil {
-		if watchErr := registeredTLSPolicy.Watch(ctx, mgr, cancel); watchErr != nil {
-			log.Error(watchErr, "Failed to start cluster TLS policy watch")
+		if watchErr := registeredTLSPolicy.WatchIfProfileAvailable(ctx, mgr, cancel); watchErr != nil {
+			log.Error(watchErr, "Failed to start cluster TLS policy watch while a TLS Profile was successfully fetched earlier")
 		}
 	}
 
