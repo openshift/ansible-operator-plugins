@@ -22,9 +22,16 @@ import (
 
 	"github.com/operator-framework/ansible-operator-plugins/internal/cmd/ansible-operator/run"
 	"github.com/operator-framework/ansible-operator-plugins/internal/cmd/ansible-operator/version"
+
+	// Registers the OpenShift centralized TLS security profile policy
+	// (OCPSTRAT-2611). Downstream-only: not part of upstream
+	// ansible-operator-plugins.
+	"github.com/operator-framework/ansible-operator-plugins/internal/ansible/openshifttls"
 )
 
 func main() {
+	run.RegisterClusterTLSPolicy(openshifttls.New())
+
 	root := cobra.Command{
 		Short: "Reconcile an Ansible operator project using ansible-runner",
 		Long: `This binary runs an Ansible operator that reconciles Kubernetes resources

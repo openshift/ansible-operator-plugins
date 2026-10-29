@@ -9,6 +9,13 @@ include $(addprefix $(DIR)/vendor/github.com/openshift/build-machinery-go/make/,
 test-e2e-ansible:
 	./openshift/ci/tests/e2e-ansible-scaffolding.sh
 
+# Deploy the sample memcached-molecule-operator and leave it running, without
+# the CR-based functional test or undeploy. Used by CI jobs (e.g.
+# tls13-adherence) that need a running operator to point another tool at.
+.PHONY: deploy-e2e-ansible
+deploy-e2e-ansible:
+	DEPLOY_ONLY=true ./openshift/ci/tests/e2e-ansible-scaffolding.sh
+
 CONTAINER_ENGINE ?= docker
 REQUIREMENTS_IMG ?= pip-requirements
 COLLECTIONS_IMG ?= get-collections
