@@ -23,7 +23,9 @@ RUN set -e && microdnf clean all && rm -rf /var/cache/dnf/* \
   && pip3 install --upgrade pip~=26.1.2 \
   && pip3 install pipenv==2026.6.2 pip-audit \
   && pipenv lock \
-  && pipenv audit \
+  # PYSEC-2026-3721 (CVE-2026-13346): pip < 26.2. Keep 26.1.2 in lock with \
+  # openshift/Dockerfile.requirements (pip-tools 7.6.0 breaks on pip 26.2.x). \
+  && pipenv audit --ignore PYSEC-2026-3721 \
   && microdnf remove -y gcc libffi-devel openssl-devel python3.12-devel which \
   && microdnf clean all \
   && rm -rf /var/cache/dnf
