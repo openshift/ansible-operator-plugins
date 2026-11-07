@@ -22,7 +22,7 @@ build-requirements:
 # generated files will be used for building the image using cachito in the OSBS environment.
 .PHONY: generate-requirements
 generate-requirements: build-requirements
-	$(CONTAINER_ENGINE) run --rm -it -v ./openshift:/tmp/requirements/:Z $(REQUIREMENTS_IMG)
+	CONTAINER_ENGINE=$(CONTAINER_ENGINE) REQUIREMENTS_IMG=$(REQUIREMENTS_IMG) bash openshift/hack/run-generation.sh requirements
 
 .PHONY: check-requirements
 check-requirements: generate-requirements
@@ -35,8 +35,7 @@ build-collections:
 
 .PHONY: update-collections
 update-collections: build-collections
-	rm -r ./openshift/release/ansible/ansible_collections
-	$(CONTAINER_ENGINE) run -u $(shell id -u):$(shell id -g) --rm -it -v ./openshift/release/ansible:/tmp/ansible_collections/:Z $(COLLECTIONS_IMG)
+	CONTAINER_ENGINE=$(CONTAINER_ENGINE) COLLECTIONS_IMG=$(COLLECTIONS_IMG) bash openshift/hack/run-generation.sh collections
 
 .PHONY: check-collections
 check-collections: update-collections
