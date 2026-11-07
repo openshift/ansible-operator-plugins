@@ -43,7 +43,8 @@ The workflow:
    Docker or Podman engine, or `CONTAINER_ENGINE` when set. Generated files are
    replaced only after the container run succeeds.
 5. Check that the four generated requirements filenames are referenced by the
-   `openshift-5.1` image config in `openshift-eng/ocp-build-data`.
+   `BUILD_DATA_BRANCH` image config in `openshift-eng/ocp-build-data`
+   (default: `openshift-5.1`).
 6. Push and open a PR. An unresolved builder, failed or skipped generation, or
    a failed image config check opens a draft PR and returns a non-zero exit
    status. The PR body names only the checks that need follow-up.
@@ -59,14 +60,20 @@ The periodic uses `openshift-app-platform-shift-bot` via the existing
 
 ### Prerequisites
 
-`git`, `gh` (GitHub CLI), `go`, `python3`, `curl`, and a working `docker` or
-`podman` engine (for collections and requirements generation). The Prow job
-uses Podman with the `nested-podman` capability and registry pull credentials.
+`git`, `gh` (GitHub CLI), `go`, `make`, `python3` with PyYAML, `curl`, and a
+working `docker` or `podman` engine for generation. The Prow job uses Podman
+with the `nested-podman` capability and registry pull credentials.
 `oc` and those credentials allow the script to verify new Go builder images.
+
+Real runs require a clean, disposable CI checkout (`OPENSHIFT_CI`, `CI`, or
+`JOB_NAME` set), with `origin` pointing to `DEST_ORG_REPO` using identical
+fetch/push URLs. A missing `upstream` remote is added; existing remotes are never
+rewritten, and pushes never force-update branches. Use a fresh checkout to retry.
 
 ### Dry-run
 
-To preview what the auto-rebase would do without making changes:
+To query the next release without changing local refs, branches, remotes,
+credentials, or files (no token or CI environment required):
 
 ```sh
 DRY_RUN=1 ./hack/auto-rebase.sh
@@ -84,16 +91,11 @@ OVERRIDE_TAG=v1.43.0 DRY_RUN=1 ./hack/auto-rebase.sh
 |---|---|---|
 | `OVERRIDE_TAG` | _(unset)_ | Rebase this tag instead of scanning |
 | `REBASE_BRANCH` | `main` | Downstream branch to rebase onto |
-| `UPSTREAM_REMOTE` | `upstream` | Remote name for upstream repo |
-| `UPSTREAM_URL` | `https://github.com/operator-framework/ansible-operator-plugins.git` | URL for the upstream remote |
-| `ORIGIN_REMOTE` | `origin` | Remote name for push |
-| `ORIGIN_URL` | `https://github.com/${DEST_ORG_REPO}.git` | URL for the origin remote |
 | `DEST_ORG_REPO` | `openshift/ansible-operator-plugins` | GitHub org/repo for PRs |
+| `BUILD_DATA_BRANCH` | `openshift-5.1` | ocp-build-data branch to validate |
 | `GITHUB_TOKEN` | _(required)_ | Token for push + `gh pr create` |
 | `CONTAINER_ENGINE` | auto-detected | Override the engine used for generation |
 | `DRY_RUN` | `0` | Only report what would happen |
-| `FORCE_REMOTE_URLS` | `0` | Allow rewriting a fork's remote URLs |
-| `ALLOW_BRANCH_DELETE` | `0` (auto `1` in CI) | Allow deleting stale local rebase branches |
 | `GIT_AUTHOR_NAME` | `openshift-app-platform-shift-bot` | Git identity for commits |
 | `GIT_AUTHOR_EMAIL` | `267347085+...@users.noreply.github.com` | Git identity email |
 
@@ -108,7 +110,13 @@ Follow the pattern from
 - **Runs:** `./hack/auto-rebase.sh`
 - **Credentials:** GitHub App `openshift-app-platform-shift-bot`
 - **CI runner:** built from `src` with Podman and the `nested-podman` capability;
-  `gh` and `oc` are installed in the job
+  `gh` and `oc` are installed in the job, and Python must provide PyYAML
+- **Environment:** `CONTAINER_ENGINE=podman`, `BUILD_DATA_BRANCH=openshift-5.1`
+
+Rehearse against a test destination before enabling the production periodic.
+
+Run focused regression checks with
+`python3 -B -m unittest discover -s hack/tests -p 'test_auto_rebase.py' -v`.
 
 ## Manual rebase
 
