@@ -1,3 +1,6 @@
+# Ansible E2E workflow: runs on every PR.
+# Validates: end-to-end tests requiring Docker/Kind cluster.
+# Make targets: make test-e2e-ansible, make test-e2e-ansible-molecule
 name: ansible
 on:
   pull_request: {}
