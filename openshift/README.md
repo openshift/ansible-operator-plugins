@@ -45,8 +45,10 @@ The workflow:
    fixes require review; failed candidates leave the main checkout unchanged.
 4. Resolve both builder pins from the final maximum `go`/`toolchain` requirement.
    Pull the candidate image and verify its full compiler version, including the
-   patch. Run `go build -mod=vendor ./...` and `go vet -mod=vendor ./...` inside
-   that builder, with networking disabled and `GOTOOLCHAIN=local`.
+   patch. Run `go build -mod=vendor -buildvcs=false ./...` and `go vet -mod=vendor -buildvcs=false ./...` inside
+   that builder, with networking disabled and `GOTOOLCHAIN=local`. VCS stamping
+   is disabled for these validation commands because the checkout is mounted
+   read-only at a different container path.
 5. Attempt collections and requirements generation using `CONTAINER_ENGINE`.
    Generated files are replaced only after the container run succeeds.
 6. Refresh GitHub credentials, push and open a PR. Any failed security scan,

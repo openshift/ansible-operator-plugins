@@ -180,7 +180,7 @@ validate_go() {
     if ! "$CONTAINER_ENGINE" run --rm --network=none "${user_args[@]}" \
         -v "$REPO_ROOT:/workspace:ro,Z" -v "$work_dir/go-cache:/go-cache:Z" -w /workspace \
         -e HOME=/tmp -e GOCACHE=/go-cache -e GOPROXY=off -e GOTOOLCHAIN=local -e CGO_ENABLED=0 \
-        --entrypoint=go "$selected_builder" "$check" -mod=vendor ./... \
+        --entrypoint=go "$selected_builder" "$check" -mod=vendor -buildvcs=false ./... \
         >"$check_artifacts/go-${check}.log" 2>&1; then
       fail_check "Go ${check}: failed in the selected builder (go-${check}.log)"
     fi

@@ -320,7 +320,7 @@ esac
         _, body = self.assert_workflow_pr(draft=True, FAIL_GO_CHECK=check)
         self.assertIn(f"Go {check}: failed", body)
         calls = (self.base / "calls.builder").read_text()
-        for argument in ("build -mod=vendor ./...", "vet -mod=vendor ./...", "--network=none", "GOTOOLCHAIN=local"):
+        for argument in ("build -mod=vendor -buildvcs=false ./...", "vet -mod=vendor -buildvcs=false ./...", "--network=none", "GOTOOLCHAIN=local"):
             self.assertIn(argument, calls)
 
     def test_build_failure_produces_draft(self):
