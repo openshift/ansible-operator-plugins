@@ -169,13 +169,15 @@ update_golang_builder() {
 
 validate_go() {
   local check
+  local -a user_args=(--user "$(id -u):$(id -g)")
+  if [[ "${CONTAINER_ENGINE##*/}" == podman ]]; then user_args=(--userns=keep-id "${user_args[@]}"); fi
   if [[ -z "$selected_builder" ]]; then
     fail_check "Go build and vet: skipped because no verified builder is available"
     return
   fi
   mkdir -p "$work_dir/go-cache"
   for check in build vet; do
-    if ! "$CONTAINER_ENGINE" run --rm --network=none --user "$(id -u):$(id -g)" \
+    if ! "$CONTAINER_ENGINE" run --rm --network=none "${user_args[@]}" \
         -v "$REPO_ROOT:/workspace:ro,Z" -v "$work_dir/go-cache:/go-cache:Z" -w /workspace \
         -e HOME=/tmp -e GOCACHE=/go-cache -e GOPROXY=off -e GOTOOLCHAIN=local -e CGO_ENABLED=0 \
         --entrypoint=go "$selected_builder" "$check" -mod=vendor ./... \

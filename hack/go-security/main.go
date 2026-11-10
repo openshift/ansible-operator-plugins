@@ -308,6 +308,7 @@ func (r runner) fix() error {
 		return err
 	}
 	var changes []string
+	advisories := map[string]map[string]bool{}
 	previous := ""
 	for pass := 0; pass <= 3; pass++ {
 		out, code, _ := r.command(candidate, "osv-scanner", "scan", "source", "--no-call-analysis=go", "--format=json", "--lockfile=go.mod")
@@ -345,6 +346,28 @@ func (r runner) fix() error {
 			if err = os.WriteFile(patchPath, patch, 0600); err != nil {
 				return err
 			}
+			for _, next := range resolved.Require {
+				oldVersion := "(added)"
+				for _, old := range baseline.Require {
+					if old.Mod.Path == next.Mod.Path {
+						oldVersion = old.Mod.Version
+					}
+				}
+				if oldVersion == next.Mod.Version {
+					continue
+				}
+				var ids []string
+				for id := range advisories[next.Mod.Path] {
+					ids = append(ids, id)
+				}
+				sort.Strings(ids)
+				reason := "dependency resolution"
+				if len(ids) > 0 {
+					reason = strings.Join(ids, ", ")
+				}
+				changes = append(changes, fmt.Sprintf("- %s: %s -> %s (%s)", next.Mod.Path, oldVersion, next.Mod.Version, reason))
+			}
+			sort.Strings(changes)
 			if len(changes) == 0 {
 				changes = []string{"Go dependency scan passed; no updates required."}
 			}
@@ -406,14 +429,37 @@ func (r runner) fix() error {
 				return fmt.Errorf("no published fix could be resolved for %s", name)
 			}
 			targets = append(targets, name+"@"+selected)
-			var ids []string
-			for _, vuln := range f.Vulnerabilities {
-				ids = append(ids, vuln.ID)
+			if advisories[name] == nil {
+				advisories[name] = map[string]bool{}
 			}
-			changes = append(changes, fmt.Sprintf("- %s: %s -> %s (%s)", name, version(f.Package.Version), selected, strings.Join(ids, ", ")))
+			for _, vuln := range f.Vulnerabilities {
+				advisories[name][vuln.ID] = true
+			}
 		}
-		if _, err = r.must(candidate, "go", append([]string{"get"}, targets...)...); err != nil {
-			return err
+		// Explicit simultaneous go-get pins can conflict with each other's minima.
+		// Apply targets separately and retain versions already raised by Go's MVS.
+		for _, target := range targets {
+			name, wanted, _ := strings.Cut(target, "@")
+			data, err := os.ReadFile(filepath.Join(candidate, "go.mod"))
+			if err != nil {
+				return err
+			}
+			current, err := modfile.Parse("go.mod", data, nil)
+			if err != nil {
+				return err
+			}
+			satisfied := false
+			for _, req := range current.Require {
+				if req.Mod.Path == name && semver.Compare(req.Mod.Version, wanted) >= 0 {
+					satisfied = true
+				}
+			}
+			if satisfied {
+				continue
+			}
+			if _, err = r.must(candidate, "go", "get", target); err != nil {
+				return err
+			}
 		}
 		if _, err = r.must(candidate, "go", "mod", "tidy"); err != nil {
 			return err

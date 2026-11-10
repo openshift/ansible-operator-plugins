@@ -104,7 +104,7 @@ func TestMalformedRanges(t *testing.T) {
 
 // Real Git worktrees with fake scanner/Go commands exercise atomic import and rollback.
 func TestStagedRemediation(t *testing.T) {
-	for _, mode := range []string{"fixed", "scanner-error", "malformed", "no-progress", "unavailable", "major-only", "three-rounds"} {
+	for _, mode := range []string{"fixed", "related-minima", "scanner-error", "malformed", "no-progress", "unavailable", "major-only", "three-rounds"} {
 		t.Run(mode, func(t *testing.T) {
 			base := t.TempDir()
 			repo := filepath.Join(base, "repo")
@@ -139,7 +139,19 @@ func TestStagedRemediation(t *testing.T) {
 			git("config", "user.email", "test@example.test")
 			git("add", ".")
 			git("-c", "commit.gpgsign=false", "commit", "-m", "base")
-			write(filepath.Join(base, "scan.json"), string(grpcScan("1.79.3", "1.82.1")))
+			scanData := grpcScan("1.79.3", "1.82.1")
+			if mode == "related-minima" {
+				initial += "require google.golang.org/protobuf v1.36.5 // indirect\n"
+				write(filepath.Join(repo, "go.mod"), initial)
+				git("add", ".")
+				git("-c", "commit.gpgsign=false", "commit", "-m", "related module fixture")
+				var scan, extra scanResult
+				_ = json.Unmarshal(scanData, &scan)
+				_ = json.Unmarshal([]byte(strings.ReplaceAll(strings.ReplaceAll(string(grpcScan("1.36.5", "1.36.7")), "google.golang.org/grpc", "google.golang.org/protobuf"), "GHSA-hrxh-6v49-42gf", "TEST-RELATED")), &extra)
+				scan.Results[0].Packages = append(scan.Results[0].Packages, extra.Results[0].Packages...)
+				scanData, _ = json.Marshal(scan)
+			}
+			write(filepath.Join(base, "scan.json"), string(scanData))
 			write(filepath.Join(bin, "osv-scanner"), `#!/bin/sh
 case "$MODE" in
  scanner-error) exit 127;;
@@ -162,7 +174,7 @@ case "$1 $2" in
  'list -mod=mod') [ "$MODE" != unavailable ]; exit;;
  'get google.golang.org/grpc@v1.82.1')
   [ "$MODE" != no-progress ] || exit 0
-  sed -i 's/v1.79.3/v1.82.1/;s/go 1.26.3/go 1.27.2/' go.mod;;
+  sed -i 's/v1.79.3/v1.82.1/;s/go 1.26.3/go 1.27.2/;s/v1.36.5/v1.36.9/' go.mod;;
  'get google.golang.org/grpc@v1.82.'*)
   sed -i "s/v1.79.[0-9]*/v1.79.$(( $(cat "$TEST_BASE/count") + 1 ))/" go.mod
   echo '// progress' >> go.mod;;
@@ -190,7 +202,7 @@ esac
 			before := git("show", "HEAD:go.mod")
 			err = (runner{repo: repo, artifacts: artifacts, log: log}).fix()
 			after, _ := os.ReadFile(filepath.Join(repo, "go.mod"))
-			if mode == "fixed" {
+			if mode == "fixed" || mode == "related-minima" {
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -199,6 +211,12 @@ esac
 				}
 				if got := git("diff", "--cached", "--name-only"); got != "go.mod\ngo.sum\nvendor/modules.txt\n" {
 					t.Fatal(got)
+				}
+				if mode == "related-minima" {
+					summary, _ := os.ReadFile(filepath.Join(artifacts, "summary.txt"))
+					if !strings.Contains(string(summary), "google.golang.org/protobuf: v1.36.5 -> v1.36.9") {
+						t.Fatal(string(summary))
+					}
 				}
 				git("-c", "commit.gpgsign=false", "commit", "-m", "fix")
 				if err = (runner{repo: repo, artifacts: artifacts, log: log}).fix(); err != nil {
