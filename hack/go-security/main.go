@@ -113,15 +113,18 @@ func parseScan(data []byte, code int) ([]finding, error) {
 	var findings []finding
 	byName := map[string]int{}
 	for _, result := range scan.Results {
+		if result.Packages == nil {
+			return nil, errors.New("scanner result has no packages")
+		}
 		for _, pkg := range result.Packages {
-			if len(pkg.Vulnerabilities) == 0 {
-				continue
-			}
 			if pkg.Package.Ecosystem != "Go" || !semver.IsValid(version(pkg.Package.Version)) {
 				return nil, errors.New("unexpected package in Go scan")
 			}
 			if err := module.Check(pkg.Package.Name, version(pkg.Package.Version)); err != nil {
 				return nil, err
+			}
+			if len(pkg.Vulnerabilities) == 0 {
+				continue
 			}
 			if index, ok := byName[pkg.Package.Name]; ok {
 				if findings[index].Package.Version != pkg.Package.Version {
@@ -153,6 +156,9 @@ func isAffected(a affected, candidate string) (bool, error) {
 		return false, errors.New("advisory has no supported version ranges")
 	}
 	for _, r := range a.Ranges {
+		if len(r.Events) == 0 {
+			return false, errors.New("version range has no events")
+		}
 		if r.Type != "SEMVER" && r.Type != "ECOSYSTEM" {
 			return false, fmt.Errorf("unsupported range type %s", r.Type)
 		}
@@ -366,6 +372,17 @@ func (r runner) fix() error {
 					reason = strings.Join(ids, ", ")
 				}
 				changes = append(changes, fmt.Sprintf("- %s: %s -> %s (%s)", next.Mod.Path, oldVersion, next.Mod.Version, reason))
+			}
+			oldGo, err := requiredGo(original)
+			if err != nil {
+				return err
+			}
+			newGo, err := requiredGo(current)
+			if err != nil {
+				return err
+			}
+			if oldGo != newGo {
+				changes = append(changes, fmt.Sprintf("- Go/toolchain requirement: %s -> %s", oldGo, newGo))
 			}
 			sort.Strings(changes)
 			if len(changes) == 0 {

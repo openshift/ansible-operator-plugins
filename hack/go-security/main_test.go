@@ -43,7 +43,7 @@ func TestScanFailsClosedAndCombinesDuplicatePackages(t *testing.T) {
 		data string
 		code int
 	}{
-		{`{}`, 0}, {`null`, 0}, {`{"results":{}}`, 0}, {`{"results":[]}`, 1},
+		{`{}`, 0}, {`{"results":[{}]}`, 0}, {`{"results":[{"packages":[{}]}]}`, 0}, {`null`, 0}, {`{"results":{}}`, 0}, {`{"results":[]}`, 1},
 		{string(grpcScan("1.79.3", "1.82.1")), 0}, {`{"results":[]}`, 127}, {`broken`, 1},
 	} {
 		if _, err := parseScan([]byte(tc.data), tc.code); err == nil {
