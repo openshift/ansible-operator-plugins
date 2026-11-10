@@ -13,6 +13,15 @@ CONTAINER_ENGINE ?= docker
 REQUIREMENTS_IMG ?= pip-requirements
 COLLECTIONS_IMG ?= get-collections
 
+# Run generated-output containers as the invoking user. No -it: CI has no TTY.
+# Rootless podman also needs --userns=keep-id so UID maps correctly.
+CONTAINER_RUN := $(CONTAINER_ENGINE) run --rm -u $(shell id -u):$(shell id -g)
+ifeq ($(notdir $(CONTAINER_ENGINE)),podman)
+ifneq ($(shell id -u),0)
+CONTAINER_RUN += --userns=keep-id
+endif
+endif
+
 .PHONY: build-requirements
 build-requirements:
 	$(CONTAINER_ENGINE) build -t $(REQUIREMENTS_IMG) -f openshift/Dockerfile.requirements .
@@ -22,7 +31,7 @@ build-requirements:
 # generated files will be used for building the image using cachito in the OSBS environment.
 .PHONY: generate-requirements
 generate-requirements: build-requirements
-	CONTAINER_ENGINE=$(CONTAINER_ENGINE) REQUIREMENTS_IMG=$(REQUIREMENTS_IMG) bash openshift/hack/run-generation.sh requirements
+	$(CONTAINER_RUN) -v ./openshift:/tmp/requirements/:Z $(REQUIREMENTS_IMG)
 
 .PHONY: check-requirements
 check-requirements: generate-requirements
@@ -35,7 +44,8 @@ build-collections:
 
 .PHONY: update-collections
 update-collections: build-collections
-	CONTAINER_ENGINE=$(CONTAINER_ENGINE) COLLECTIONS_IMG=$(COLLECTIONS_IMG) bash openshift/hack/run-generation.sh collections
+	rm -rf ./openshift/release/ansible/ansible_collections
+	$(CONTAINER_RUN) -v ./openshift/release/ansible:/tmp/ansible_collections/:Z $(COLLECTIONS_IMG)
 
 .PHONY: check-collections
 check-collections: update-collections

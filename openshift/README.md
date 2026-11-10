@@ -36,60 +36,41 @@ The workflow:
 
 1. Compare `UPSTREAM-VERSION` to the newest upstream `v*` release tag.
 2. If newer, run `./openshift/hack/rebase_upstream.sh <tag> main`.
-3. Scan root Go dependencies with checksum-verified OSV-Scanner 2.7.1, with Go
-   call analysis disabled so vulnerable indirect modules are included. In a
-   temporary worktree, apply the smallest published same-major fixed versions
-   satisfying all reported advisories, tidy, vendor and rescan (at most three
-   remediation rounds). Import only a clean rescanned result, in a separate
-   commit recording advisory IDs and versions. Unfixed, unavailable or major-only
-   fixes require review; failed candidates leave the main checkout unchanged.
-4. Resolve both builder pins from the final maximum `go`/`toolchain` requirement.
-   Pull the candidate image and verify its full compiler version, including the
-   patch. Run `go build -mod=vendor -buildvcs=false ./...` and `go vet -mod=vendor -buildvcs=false ./...` inside
-   that builder, with networking disabled and `GOTOOLCHAIN=local`. VCS stamping
-   is disabled for these validation commands because the checkout is mounted
-   read-only at a different container path.
-5. Attempt collections and requirements generation using `CONTAINER_ENGINE`.
-   Generated files are replaced only after the container run succeeds.
-6. Refresh GitHub credentials, push and open a PR. Any failed security scan,
-   remediation, builder, build, vet or generation check produces a draft PR and
-   a failing job. Independent generation and validation checks still run.
+3. Update golang builder pins (`.ci-operator.yaml`, `openshift/Dockerfile`) if
+   the upstream Go version changed. The OCP version suffix is kept as-is; the
+   resulting image is not verified, so a missing image surfaces as a CI failure
+   on the PR.
+4. Attempt `make -f openshift/Makefile update-collections` and
+   `make -f openshift/Makefile generate-requirements`. If either fails, the
+   committed outputs are restored so partial results are never committed.
+5. Push and open a PR. A failed generation, unavailable container engine, or
+   unreadable builder pins opens a draft PR and returns a non-zero exit status.
+   The PR body lists the checks that need follow-up.
 
-Prow retains scanner JSON, remediation logs/patch/summary, compiler verification,
-helper build output, and build/vet logs under
-`$ARTIFACT_DIR/auto-rebase-checks`.
 The bot does **not** auto-merge. A human reviews, verifies collections and
-requirements and their references in `openshift-eng/ocp-build-data`, requests an
-ART test build, and merges. An existing open PR, including a draft, is skipped;
-the periodic does not retry failed steps or promote existing drafts.
-Conflict details are recorded under `Overwritten conflicts:` in the upstream
-merge commit.
+requirements, requests an ART test build, and merges.
 
 ### Credentials
 
 The periodic uses `openshift-app-platform-shift-bot` via the existing
 `test-credentials` secret. The GitHub App must be installed on this repo with
-`contents:write` and `pull_requests:write`. The job does not merge. The periodic uses a token provider to mint a new scoped
-installation token before publication, so lengthy generation cannot exhaust the
-initial token lifetime. Provider output must contain only the token and must
-never be logged.
+`contents:write` and `pull_requests:write`. It cannot merge.
 
 ### Prerequisites
 
-`git`, `gh` (GitHub CLI), `go`, `make`, checksum-verified `osv-scanner`
-2.7.1, and a working `docker` or `podman` engine for validation and generation. The Prow job uses Podman with the `nested-podman`
-capability and registry pull credentials.
-`oc` and those credentials allow the script to verify new Go builder images.
+`git`, `gh` (GitHub CLI), `go`, `make`, and a working container engine for
+generation. The Prow job uses Podman with the `nested-podman` capability and
+registry pull credentials.
+
 Set `CONTAINER_ENGINE` explicitly for automatic rebases. An unset or unavailable
 engine skips generation and produces a draft PR. Dry runs need no engine, and
 manual Makefile targets retain their Docker default.
 
 Real runs require a clean, disposable CI checkout (`OPENSHIFT_CI`, `CI`, or
-`JOB_NAME` set), with `origin` pointing to `DEST_ORG_REPO` using identical
-fetch/push URLs. A missing `upstream` remote is added; existing remotes are never
-rewritten, and pushes never force-update branches. Use a fresh checkout to retry.
-If a previous run pushed the branch but failed to open its PR, the retry reuses
-that branch only after verifying matching contents and upstream/downstream ancestry.
+`JOB_NAME` set), with `origin` pointing to `DEST_ORG_REPO` (a mismatch fails
+at `gh pr create`). A missing `upstream` remote is added and its URL is
+validated by `rebase_upstream.sh`; existing remotes are never rewritten, and
+pushes never force-update branches.
 
 ### Dry-run
 
@@ -113,42 +94,30 @@ OVERRIDE_TAG=v1.43.0 DRY_RUN=1 ./hack/auto-rebase.sh
 | `OVERRIDE_TAG` | _(unset)_ | Rebase this tag instead of scanning |
 | `REBASE_BRANCH` | `main` | Downstream branch to rebase onto |
 | `DEST_ORG_REPO` | `openshift/ansible-operator-plugins` | GitHub org/repo for PRs |
-| `GITHUB_TOKEN` | _(required unless provider set)_ | Token for GitHub queries and publication |
-| `GITHUB_TOKEN_COMMAND` | _(unset)_ | Executable that prints a fresh token; called initially and immediately before push and PR creation |
-| `CONTAINER_ENGINE` | _(required for validation and generation)_ | Engine executable, e.g. `podman` or `docker` |
+| `GITHUB_TOKEN` | _(required)_ | Token for push + `gh pr create` |
+| `CONTAINER_ENGINE` | _(required for generation)_ | Engine executable, e.g. `podman` or `docker` |
 | `DRY_RUN` | `0` | Only report what would happen |
 | `GIT_AUTHOR_NAME` | `openshift-app-platform-shift-bot` | Git identity for commits |
 | `GIT_AUTHOR_EMAIL` | `267347085+...@users.noreply.github.com` | Git identity email |
 
 ### Companion Prow job
 
-The periodic job definition lives in `openshift/release` (not in this repo), in
-[openshift/release#85898](https://github.com/openshift/release/pull/85898):
+The periodic job definition lives in `openshift/release` (not in this repo).
+Follow the pattern from
+[openshift/release#82799](https://github.com/openshift/release/pull/82799):
 
 - **Job name:** `periodic-ci-openshift-ansible-operator-plugins-main-periodics-auto-rebase`
 - **Schedule:** `0 6 * * 1` (Mondays 06:00 UTC)
 - **Runs:** `./hack/auto-rebase.sh`
 - **Credentials:** GitHub App `openshift-app-platform-shift-bot`
 - **CI runner:** built from `src` with Podman and the `nested-podman` capability;
-  the job uses `curl` to install `gh`, `oc`, and checksum-pinned OSV-Scanner,
-  and Python to read GitHub token responses
-- **Environment:** `CONTAINER_ENGINE=podman` and registry pull credentials
+  `gh` is installed in the job
+- **Environment:** `CONTAINER_ENGINE=podman`
 
 Rehearse against a test destination before enabling the production periodic.
 
 Run focused regression checks with
-`python3 -B -m unittest discover -s hack/tests -p 'test_auto_rebase.py' -v`
-and `go test -mod=vendor ./hack/go-security`.
-
-For historical rehearsals, run
-`hack/prepare-rebase-rehearsal.sh SOURCE_REF BASELINE OLD_TAG NEW_TAG NEW_DIRECTORY`
-in an isolated clone with both upstream tags fetched. It verifies genuine
-old-release ancestry and absence of the target release, copies complete tooling
-directories (including the requirements guide), and commits a file hash manifest.
-Compare upstream runtime inputs and collections with the actual release PR, check
-that gRPC is at least 1.82.1 and the missed advisory is absent, and report newer
-security fixes and Python regeneration drift separately. ART validation remains
-a separate release gate.
+`python3 -B -m unittest discover -s hack/tests -p 'test_auto_rebase.py' -v`.
 
 ## Manual rebase
 

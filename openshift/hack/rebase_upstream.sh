@@ -8,13 +8,11 @@
 # Warning: this script resolves all conflicts by overwritting the conflict with
 # the upstream version. If a ansible-operator specific patch was made downstream that is
 # not in the incoming upstream code, the changes will be lost.
-#
-# Origin remote is assumed to point to openshift/ansible-operator-plugins
 
 set -euo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
-cd "$REPO_ROOT" || exit 1
+cd "$REPO_ROOT"
 
 # shellcheck source=openshift/hack/rebase-lib.sh
 source "$REPO_ROOT/openshift/hack/rebase-lib.sh"
@@ -22,7 +20,6 @@ source "$REPO_ROOT/openshift/hack/rebase-lib.sh"
 version=${1:-}
 rebase_branch=${2:-main}
 upstream_remote=${3:-upstream}
-origin_remote=${ORIGIN_REMOTE:-origin}
 
 # sanity checks
 if [[ -z "$version" ]]; then
@@ -44,66 +41,34 @@ git diff-index --quiet HEAD || { printf "!! Git status not clean, aborting !!\n\
 git fetch -t "$upstream_remote"
 
 # do work on the correct branch
-git checkout "$rebase_branch" || { echo "Failed to checkout $rebase_branch, aborting."; exit 1; }
-if ! remote_branch=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}'); then
-  echo "Your branch is not properly tracking a remote as required, aborting."
-  exit 1
-fi
-if ! git merge "$remote_branch"; then
-  if git rev-parse -q --verify MERGE_HEAD >/dev/null; then
-    git merge --abort || { echo "Failed to abort merge $remote_branch."; exit 1; }
-  fi
-  echo "Failed to merge $remote_branch, aborting."
-  exit 1
-fi
+git checkout "$rebase_branch"
+remote_branch=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}') \
+  || { echo "Your branch is not properly tracking a remote as required, aborting."; exit 1; }
+git merge "$remote_branch"
 git checkout -b "$version"-rebase-"$rebase_branch" || { echo "Expected branch $version-rebase-$rebase_branch to not exist, delete and retry."; exit 1; }
 
-# do the merge, but don't commit so tweaks below are included in commit
-if ! git merge --no-ff --no-commit "tags/$version"; then
-  if ! git rev-parse -q --verify MERGE_HEAD >/dev/null; then
-    echo "Failed to merge tags/$version, aborting."
-    exit 1
-  fi
-fi
+# do the merge, but don't commit so tweaks below are included in commit.
+# A merge with conflicts exits non-zero; continue only if it is in progress.
+git merge --no-ff --no-commit "tags/$version" || git rev-parse -q --verify MERGE_HEAD >/dev/null
 
 # preserve our version of these files
 git checkout HEAD -- OWNERS_ALIASES
 
 # unmerged files are overwritten with the upstream copy
 unmerged_files=$(git diff --name-only --diff-filter=U)
-
 if [[ -n "$unmerged_files" ]]; then
-  # Resolve each unmerged file: remove deletions, take upstream on conflicts.
   while IFS= read -r fname; do
     [[ -n "$fname" ]] || continue
     sts=$(git status --porcelain -- "$fname" | cut -c1-2)
     case "$sts" in
-      DD|AU|UD)
-        git rm -- "$fname"
-        ;;
-      DU)
-        git checkout --theirs -- "$fname"
-        git add -- "$fname"
-        ;;
-      UA)
-        git add -- "$fname"
-        ;;
-      AA|UU)
-        git checkout --theirs -- "$fname"
-        git add -- "$fname"
-        ;;
+      DD|AU|UD) git rm -- "$fname" ;;
+      UA) git add -- "$fname" ;;
+      AA|UU|DU) git checkout --theirs -- "$fname" && git add -- "$fname" ;;
       *) echo "Unhandled conflict status: $sts" >&2; exit 1 ;;
     esac
   done <<< "$unmerged_files"
-
 else
   unmerged_files="<NONE>"
-fi
-
-# Upstream whitespace is preserved; only unresolved index entries block the merge.
-if ! git diff --quiet --diff-filter=U --; then
-  echo "Unresolved merge conflicts remain, aborting." >&2
-  exit 1
 fi
 
 # just to make sure an old version merge is not being made
@@ -113,26 +78,21 @@ git diff --staged --quiet && { echo "No changed files in merge?! Aborting."; exi
 echo "$version" > UPSTREAM-VERSION
 git add UPSTREAM-VERSION
 
-# make local commit
-if ! git commit -m "Merge upstream tag $version" -m "Ansible Operator Plugins $version" -m "Merge executed via ./openshift/hack/rebase_upstream.sh $version $rebase_branch $upstream_remote" -m "$(printf "Overwritten conflicts:\n%s" "$unmerged_files")"; then
-  echo "Failed to create the upstream merge commit, aborting."
-  exit 1
-fi
+# make local commit (git refuses if any conflict is still unresolved)
+git commit -m "Merge upstream tag $version" -m "Ansible Operator Plugins $version" \
+  -m "Merge executed via ./openshift/hack/rebase_upstream.sh $version $rebase_branch $upstream_remote" \
+  -m "$(printf "Overwritten conflicts:\n%s" "$unmerged_files")"
 
 echo "output the commits pulled from upstream as part of rebase"
-merge_base=$(git merge-base "$origin_remote/$rebase_branch" "tags/$version") || exit 1
-git --no-pager log --oneline "${merge_base}..tags/$version"
+git --no-pager log --oneline "$(git merge-base "$remote_branch" "tags/$version")..tags/$version"
 
-# update vendor directory, abort if there's an error encountered
-if ! go mod tidy || ! go mod vendor; then
-  echo "go mod vendor failed. Aborting!"
-  exit 1
-fi
+# update vendor directory
+{ go mod tidy && go mod vendor; } || { echo "go mod vendor failed. Aborting!"; exit 1; }
 commit_paths "UPSTREAM: <drop>: Update vendor directory" go.mod go.sum vendor
 
 # Manual rebases stop at the first generation failure. The CI wrapper runs
-# these same steps independently and reports failures in a draft PR.
-if [[ "${SKIP_GENERATION:-0}" != "1" ]]; then
+# these steps itself so it can report failures in a draft PR instead.
+if [[ "${SKIP_GENERATION:-0}" != 1 ]]; then
   generate_and_commit collections || { echo "Updating collections failed." >&2; exit 1; }
   generate_and_commit requirements || { echo "Generating requirements failed." >&2; exit 1; }
 fi
