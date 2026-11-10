@@ -93,7 +93,7 @@ _verify_builder() {
 
 # Inventory is a hint; an authenticated pull and compiler check prove suitability.
 _resolve_builder_ocp() {
-  local new_go=$1 current_ocp=$2 all_tags prefix ocp inventory
+  local new_go=$1 current_ocp=$2 all_tags prefix ocp inventory name namespace
   command -v oc >/dev/null 2>&1 || return 1
   if _verify_builder "$new_go" "$current_ocp"; then printf '%s\n' "$current_ocp"; return; fi
   for inventory in 'builder ocp rhel-9-golang-' 'release openshift rhel-9-release-golang-'; do
@@ -177,7 +177,7 @@ validate_go() {
   for check in build vet; do
     if ! "$CONTAINER_ENGINE" run --rm --network=none --user "$(id -u):$(id -g)" \
         -v "$REPO_ROOT:/workspace:ro,Z" -v "$work_dir/go-cache:/go-cache:Z" -w /workspace \
-        -e HOME=/tmp -e GOCACHE=/go-cache -e GOPROXY=off -e GOTOOLCHAIN=local \
+        -e HOME=/tmp -e GOCACHE=/go-cache -e GOPROXY=off -e GOTOOLCHAIN=local -e CGO_ENABLED=0 \
         --entrypoint=go "$selected_builder" "$check" -mod=vendor ./... \
         >"$check_artifacts/go-${check}.log" 2>&1; then
       fail_check "Go ${check}: failed in the selected builder (go-${check}.log)"

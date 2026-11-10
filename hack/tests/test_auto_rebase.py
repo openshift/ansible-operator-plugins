@@ -498,5 +498,56 @@ main
                 self.git("checkout", "main")
                 self.git("branch", "-D", "v1.10.0-rebase-main")
 
+class RehearsalFixtureTests(unittest.TestCase):
+    def test_complete_tooling_and_historical_ancestry(self):
+        with tempfile.TemporaryDirectory(prefix="rehearsal-fixture-test-") as base:
+            repo = Path(base) / "source"
+            repo.mkdir()
+            def git(*args):
+                return subprocess.check_output(["git", *args], cwd=repo, stderr=subprocess.STDOUT, text=True)
+            git("init", "-b", "main")
+            git("config", "user.name", "Test")
+            git("config", "user.email", "test@example.test")
+            git("config", "commit.gpgsign", "false")
+            for name, content in {
+                "UPSTREAM-VERSION": "v1.0.0\n", "go.mod": "historical Go inputs\n",
+                "hack/a.sh": "old", "openshift/hack/a.sh": "old",
+                "openshift/Makefile": "old", "openshift/Dockerfile.requirements": "old",
+                "openshift/README.md": "old",
+            }.items():
+                path = repo / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content)
+            git("add", ".")
+            git("commit", "-m", "historical release")
+            git("tag", "v1.0.0")
+            baseline = git("rev-parse", "HEAD").strip()
+            git("checkout", "-b", "upstream")
+            (repo / "UPSTREAM-VERSION").write_text("v1.0.1\n")
+            git("commit", "-am", "target release")
+            git("tag", "v1.0.1")
+            target = git("rev-parse", "HEAD").strip()
+            git("checkout", "main")
+            (repo / "openshift/hack/generate_requirements.md").write_text("complete guide\n")
+            (repo / "hack/extra-tool.sh").write_text("complete tooling\n")
+            git("add", ".")
+            git("commit", "-m", "current tooling")
+            destination = Path(base) / "fixture"
+            result = subprocess.run(["bash", str(ROOT / "hack/prepare-rebase-rehearsal.sh"),
+                                     "HEAD", baseline, "v1.0.0", "v1.0.1", str(destination)],
+                                    cwd=repo, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            for path in ("openshift/hack/generate_requirements.md", "hack/extra-tool.sh"):
+                self.assertEqual((destination / path).read_bytes(), (repo / path).read_bytes())
+                self.assertIn(path, (destination / ".rehearsal-manifest").read_text())
+            self.assertEqual((destination / "go.mod").read_text(), "historical Go inputs\n")
+            result = subprocess.run(["bash", str(ROOT / "hack/prepare-rebase-rehearsal.sh"),
+                                     "HEAD", target, "v1.0.1", "v1.0.1", str(Path(base) / "bad")],
+                                    cwd=repo, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("already contains the target", result.stderr)
+            self.assertFalse((Path(base) / "bad").exists())
+
+
 if __name__ == "__main__":
     unittest.main()
