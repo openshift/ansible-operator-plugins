@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "c937634ef42c631306296b0bfc6f32079c2ceb9cc845666aced56bf7241578a1"
+            "sha256": "6ce03a94bc31d0ee3991c0ae9ae057ab113af15437a74dfbd97a42018747d6d0"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -36,11 +36,12 @@
         },
         "certifi": {
             "hashes": [
-                "sha256:62f22742b58a1a33014a2b6b706588a8d7e2a88ae7bd1a6ebe8c992928483775",
-                "sha256:741e2c3b351ddf169a738da9f2c048608ff7f2c5cc02f1ebc6b118bb090d5d55"
+                "sha256:035c1e85572b141bf1c3a3eff0e33a8eb74917522f2559075ff8d2fea780a1ae",
+                "sha256:42d35340cc5b9ba78e818ddbff0c5b1c2b779de448a340fd1b989f5fa8670e1b"
             ],
+            "index": "pypi",
             "markers": "python_version >= '3.7'",
-            "version": "==2026.7.22"
+            "version": "==2026.10.19"
         },
         "cffi": {
             "hashes": [
@@ -597,11 +598,12 @@
         },
         "oauthlib": {
             "hashes": [
-                "sha256:624c28c13a0a59cabf9747dfa52af63be3e512a7f2714df16e91b5b3a145e6cd",
-                "sha256:efb274799819440f95b4ab3b818869f1ce9ae26c5beacba0201d1a1b76b54f86"
+                "sha256:3d73febdb6faa00f277c81fb04be7b7586fb96fc3b7f0b9c772dada69a25ede7",
+                "sha256:498a298876e996301950a5b053d12c31628bb7b895db03666430c69ce182eb61"
             ],
+            "index": "pypi",
             "markers": "python_version >= '3.9'",
-            "version": "==4.0.0"
+            "version": "==4.0.1"
         },
         "packaging": {
             "hashes": [
@@ -627,11 +629,12 @@
         },
         "pyasn1": {
             "hashes": [
-                "sha256:9c447d8431c947fe4c8febc4ed9e760bc29011a5b01e5c74b67025bd9fb8ce81",
-                "sha256:deda9277cfd454080ec40b207fb6df82206a3a2688735233cdcd8d3d565f088b"
+                "sha256:4017b0fce125096b8573b39c989fdb1a4b19cf761e683398184550fea0e66587",
+                "sha256:6b11616a6bcf3a40e635f082bb232fa57b5e0dd7f517bd7ddd69ec3794508a47"
             ],
+            "index": "pypi",
             "markers": "python_version >= '3.8'",
-            "version": "==0.6.4"
+            "version": "==0.6.5"
         },
         "pyasn1-modules": {
             "hashes": [

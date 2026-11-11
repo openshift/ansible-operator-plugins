@@ -8,7 +8,7 @@ ansible-core==2.18.19
     # via -r /requirements.in
 ansible-runner==2.4.3
     # via -r /requirements.in
-certifi==2026.7.22
+certifi==2026.10.19
     # via
     #   -r /requirements.in
     #   kubernetes
@@ -52,7 +52,7 @@ markupsafe==3.0.4
     # via
     #   -r /requirements.in
     #   jinja2
-oauthlib==4.0.0
+oauthlib==4.0.1
     # via
     #   -r /requirements.in
     #   kubernetes
@@ -70,7 +70,7 @@ ptyprocess==0.7.0
     # via
     #   -r /requirements.in
     #   pexpect
-pyasn1==0.6.4
+pyasn1==0.6.5
     # via
     #   -r /requirements.in
     #   pyasn1-modules

@@ -1,3 +1,2 @@
 # requirements-build1.txt
-# 'kubernetes' has an internal build-dep conflict on 'setuptools-scm'.
-# Its build deps are excluded; the package itself is in requirements.txt.
+# No packages assigned to this phase
