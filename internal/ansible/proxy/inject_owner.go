@@ -49,6 +49,7 @@ type injectOwnerReferenceHandler struct {
 	apiResources      *apiResources
 }
 
+// ServeHTTP injects the CR owner reference into create/update requests before forwarding.
 func (i *injectOwnerReferenceHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case http.MethodPost:

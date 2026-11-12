@@ -63,6 +63,7 @@ type EventReceiver struct {
 	logger logr.Logger
 }
 
+// New creates an EventReceiver that listens for ansible-runner events on a Unix socket.
 func New(ident string, errChan chan<- error) (*EventReceiver, error) {
 	sockPath := fmt.Sprintf("/tmp/ansibleoperator-%s", ident)
 	listener, err := net.Listen("unix", sockPath)

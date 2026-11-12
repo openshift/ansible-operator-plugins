@@ -49,6 +49,8 @@ import (
 // This is the default timeout to wait for the cache to respond
 // todo(shawn-hurley): Eventually this should be configurable
 const cacheEstablishmentTimeout = 6 * time.Second
+
+// AutoSkipCacheREList is a comma-separated list of regex patterns for paths that bypass the proxy cache.
 const AutoSkipCacheREList = "^/api/.*/pods/.*/exec,^/api/.*/pods/.*/attach"
 
 // RequestLogHandler - log the requests that come through the proxy.
@@ -357,6 +359,7 @@ func (a *apiResources) resetResources() error {
 	return nil
 }
 
+// IsVirtualResource returns true if the GVK is a virtual (non-persisted) Kubernetes resource.
 func (a *apiResources) IsVirtualResource(gvk schema.GroupVersionKind) (bool, error) {
 	a.mu.RLock()
 	apiResource, ok := a.gvkToAPIResource[gvk.String()]

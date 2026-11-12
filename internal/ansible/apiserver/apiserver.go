@@ -29,11 +29,13 @@ import (
 
 var log = logf.Log.WithName("apiserver")
 
+// Options configures the user-metrics HTTP server (address and port).
 type Options struct {
 	Address string
 	Port    int
 }
 
+// Run starts the user-metrics HTTP server on the configured address and port.
 func Run(options Options) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/metrics", metricsHandler)

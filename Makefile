@@ -46,6 +46,17 @@ include .bingo/Variables.mk
 BUILD_GOOS ?= $(shell go env GOOS)
 BUILD_GOARCH ?= $(shell go env GOARCH)
 
+##@ Setup and Verification
+
+.PHONY: setup
+setup: $(GOLANGCI_LINT) $(SETUP_ENVTEST) $(KIND) ## Bootstrap dev tools via bingo (idempotent, no cluster creation)
+
+.PHONY: verify
+verify: test-static ## Full non-cluster validation (CI-equivalent: sanity + unit)
+
+.PHONY: check
+check: verify ## Alias for verify
+
 ##@ Development
 
 .PHONY: generate
@@ -120,17 +131,23 @@ test-sanity: generate fix ## Test repo formatting, linting, etc.
 	make lint
 	git diff --exit-code # diff again to ensure other checks don't change repo
 
-.PHONY: test-docs
-test-docs: ## Test doc links
-	go run ./release/changelog/gen-changelog.go -validate-only
-	git submodule update --init --recursive website/
-	./hack/check-links.sh
+# test-docs is disabled: requires missing release/changelog/gen-changelog.go,
+# website/ submodule, and hack/check-links.sh. Do not add to CI until restored.
+# .PHONY: test-docs
+# test-docs: ## Test doc links
+# 	go run ./release/changelog/gen-changelog.go -validate-only
+# 	git submodule update --init --recursive website/
+# 	./hack/check-links.sh
 
 .PHONY: test-unit
 ENVTEST_VERSION = $(shell go list -m k8s.io/client-go | cut -d" " -f2 | sed 's/^v0\.\([[:digit:]]\{1,\}\)\.[[:digit:]]\{1,\}$$/1.\1.x/')
 TEST_PKGS = $(shell go list ./... | grep -v -E 'github.com/operator-framework/ansible-operator-plugins/test/')
 test-unit: $(SETUP_ENVTEST) ## Run unit tests
 	KUBEBUILDER_ASSETS="$(shell $(SETUP_ENVTEST) use $(ENVTEST_VERSION) -p path)" go test -coverprofile=coverage.out -covermode=count -short $(TEST_PKGS)
+
+.PHONY: test-race
+test-race: $(SETUP_ENVTEST) ## Run unit tests with race detector
+	KUBEBUILDER_ASSETS="$(shell $(SETUP_ENVTEST) use $(ENVTEST_VERSION) -p path)" CGO_ENABLED=1 go test -race -short $(TEST_PKGS)
 
 e2e_tests := test-e2e-ansible test-e2e-ansible-molecule
 e2e_targets := test-e2e $(e2e_tests)
