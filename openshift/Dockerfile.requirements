@@ -15,13 +15,11 @@ RUN curl -LO https://raw.githubusercontent.com/containerbuildsystem/cachito/mast
   && chmod +x pip_find_builddeps.py
 
 # Pinned (rather than "latest") because pip-tools relies on pip's internal,
-# unstable RequirementCommand API — an unpinned pip can drift ahead of the
-# pip-tools release actually being installed and break pip-compile with a
-# TypeError (seen in practice: pip 26.2.1 + pip-tools 7.6.0 on the same day).
-# 26.1.2 is the newest pip release pip-tools 7.6.0's own changelog claims
-# compatibility with; verified locally that it produces byte-identical
-# generated requirements files to earlier pip 24.x pins.
-RUN python3 -m pip install --no-cache-dir --upgrade pip==26.1.2
+# unstable RequirementCommand API. pip-tools 7.6.0 fails on pip 26.2.x;
+# 7.6.2 is the current release that supports pip 26.2. Pin pip 26.2.2 so
+# PYSEC-2026-3721 / CVE-2026-13346 (pip < 26.2) is closed without ignoring
+# it in pipenv audit.
+RUN python3 -m pip install --no-cache-dir --upgrade pip==26.2.2
 
 # Install tooling, then run the requirements generator.
 #
@@ -64,7 +62,7 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip==26.1.2
 # upstream rebases without waiting on an upstream release. See "Why
 # openshift/Pipfile.lock Can Differ..." in generate_requirements.md.
 RUN python3 -m pip install --no-cache-dir pipenv==2023.11.15 \
-  && python3 -m pip install --no-cache-dir pip-tools==7.6.0 \
+  && python3 -m pip install --no-cache-dir pip-tools==7.6.2 \
   && python3 generate_requirements.py
 
 VOLUME /tmp/requirements

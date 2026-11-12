@@ -1,2 +1,3 @@
 # requirements-build1.txt
-# No packages assigned to this phase
+# 'ansible-runner' has an internal build-dep conflict on 'setuptools'.
+# Its build deps are excluded; the package itself is in requirements.txt.
