@@ -22,6 +22,104 @@ The downstream artifacts are as follows:
 # Syncing
 
 When an upstream release is ready, you can sync down that release downstream.
+This can be done manually or automatically via a Prow periodic.
+
+## Automatic rebase (periodic)
+
+A Prow periodic runs [`hack/auto-rebase.sh`](../hack/auto-rebase.sh) weekly
+against `main`. A custom script is used because this repo rebases via **git
+merge** (not `git rebase` like rebasebot) and discovers releases by selecting the
+newest `v*` tag beyond [`UPSTREAM-VERSION`](../UPSTREAM-VERSION) rather than
+tracking a branch.
+
+The workflow:
+
+1. Compare `UPSTREAM-VERSION` to the newest upstream `v*` release tag.
+2. If newer, run `./openshift/hack/rebase_upstream.sh <tag> main`.
+3. Update golang builder pins (`.ci-operator.yaml`, `openshift/Dockerfile`) if
+   the upstream Go version changed. The OCP version suffix is kept as-is; the
+   resulting image is not verified, so a missing image surfaces as a CI failure
+   on the PR.
+4. Attempt `make -f openshift/Makefile update-collections` and
+   `make -f openshift/Makefile generate-requirements`. If either fails, the
+   committed outputs are restored so partial results are never committed.
+5. Push and open a PR. A failed generation, unavailable container engine, or
+   unreadable builder pins opens a draft PR and returns a non-zero exit status.
+   The PR body lists the checks that need follow-up.
+
+The bot does **not** auto-merge. A human reviews, verifies collections and
+requirements, requests an ART test build, and merges.
+
+### Credentials
+
+The periodic uses `openshift-app-platform-shift-bot` via the existing
+`test-credentials` secret. The GitHub App must be installed on this repo with
+`contents:write` and `pull_requests:write`. It cannot merge.
+
+### Prerequisites
+
+`git`, `gh` (GitHub CLI), `go`, `make`, and a working container engine for
+generation. The Prow job uses Podman with the `nested-podman` capability and
+registry pull credentials.
+
+Set `CONTAINER_ENGINE` explicitly for automatic rebases. An unset or unavailable
+engine skips generation and produces a draft PR. Dry runs need no engine, and
+manual Makefile targets retain their Docker default.
+
+Real runs require a clean, disposable CI checkout (`OPENSHIFT_CI`, `CI`, or
+`JOB_NAME` set), with `origin` pointing to `DEST_ORG_REPO` (a mismatch fails
+at `gh pr create`). A missing `upstream` remote is added and its URL is
+validated by `rebase_upstream.sh`; existing remotes are never rewritten, and
+pushes never force-update branches.
+
+### Dry-run
+
+To query the next release without changing local refs, branches, remotes,
+credentials, or files (no token or CI environment required):
+
+```sh
+DRY_RUN=1 ./hack/auto-rebase.sh
+```
+
+To force a specific tag:
+
+```sh
+OVERRIDE_TAG=v1.43.0 DRY_RUN=1 ./hack/auto-rebase.sh
+```
+
+### Environment variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `OVERRIDE_TAG` | _(unset)_ | Rebase this tag instead of scanning |
+| `REBASE_BRANCH` | `main` | Downstream branch to rebase onto |
+| `DEST_ORG_REPO` | `openshift/ansible-operator-plugins` | GitHub org/repo for PRs |
+| `GITHUB_TOKEN` | _(required)_ | Token for push + `gh pr create` |
+| `CONTAINER_ENGINE` | _(required for generation)_ | Engine executable, e.g. `podman` or `docker` |
+| `DRY_RUN` | `0` | Only report what would happen |
+| `GIT_AUTHOR_NAME` | `openshift-app-platform-shift-bot` | Git identity for commits |
+| `GIT_AUTHOR_EMAIL` | `267347085+...@users.noreply.github.com` | Git identity email |
+
+### Companion Prow job
+
+The periodic job definition lives in `openshift/release` (not in this repo).
+Follow the pattern from
+[openshift/release#82799](https://github.com/openshift/release/pull/82799):
+
+- **Job name:** `periodic-ci-openshift-ansible-operator-plugins-main-periodics-auto-rebase`
+- **Schedule:** `0 6 * * 1` (Mondays 06:00 UTC)
+- **Runs:** `./hack/auto-rebase.sh`
+- **Credentials:** GitHub App `openshift-app-platform-shift-bot`
+- **CI runner:** built from `src` with Podman and the `nested-podman` capability;
+  `gh` is installed in the job
+- **Environment:** `CONTAINER_ENGINE=podman`
+
+Rehearse against a test destination before enabling the production periodic.
+
+Run focused regression checks with
+`python3 -B -m unittest discover -s hack/tests -p 'test_auto_rebase.py' -v`.
+
+## Manual rebase
 
 ## Verify upstream
 
