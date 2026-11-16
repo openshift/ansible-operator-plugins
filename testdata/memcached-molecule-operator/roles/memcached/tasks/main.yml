@@ -1,5 +1,21 @@
 ---
 # tasks file for Memcached
+- name: Set local environment for markUnsafe comparison
+  ansible.builtin.set_fact:
+    local_environment: staging
+
+- name: Create ConfigMap when CR environment differs from local value
+  kubernetes.core.k8s:
+    definition:
+      kind: ConfigMap
+      apiVersion: v1
+      metadata:
+        name: markunsafe-mismatch-test
+        namespace: "{{ ansible_operator_meta.namespace }}"
+      data:
+        cr_environment: "{{ environment }}"
+  when: local_environment != environment
+
 - name: start memcached
   kubernetes.core.k8s:
     definition:
