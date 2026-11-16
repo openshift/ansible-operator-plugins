@@ -21,7 +21,7 @@ charset-normalizer==3.5.2
     # via
     #   -r requirements.in
     #   google-auth
-google-auth==2.62.1
+google-auth==2.62.2
     # via
     #   -r requirements.in
     #   kubernetes
@@ -68,7 +68,7 @@ pyasn1-modules==0.4.2
     #   cffi
 python-daemon==3.1.2
     # via -r requirements.in
-python-dateutil==2.9.0
+python-dateutil==4.0.0
     # via
     #   -r requirements.in
     #   kubernetes
@@ -91,6 +91,9 @@ six==1.17.0
     # via
     #   -r requirements.in
     #   kubernetes
+tzdata==2026.6
+    # via
+    #   -r requirements.in
     #   python-dateutil
 urllib3==2.8.0
     # via
