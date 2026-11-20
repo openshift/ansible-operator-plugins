@@ -33,6 +33,8 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip==26.2.2
 #   3. Collects per-package build-system requirements via pip_find_builddeps.py.
 #   4. Detects version conflicts across all build deps using pip-compile + error
 #      parsing and splits conflicting packages into ordered installation phases.
+#      A single-package phase that cannot compile still emits that package's
+#      PEP 517 upper-bound pin so Hermeto prefetches it.
 #   4b. Closes the *transitive* build-dep graph: packages pulled into a build
 #      phase only as a dependency-of-a-dependency (e.g. trove-classifiers, via
 #      hatchling) are never scanned by pip_find_builddeps.py in step 3. Their
