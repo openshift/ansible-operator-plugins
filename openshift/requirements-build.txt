@@ -60,6 +60,8 @@ trove-classifiers==2026.9.21.13
     # via
     #   -r requirements-build.in
     #   hatchling
+typing-extensions==4.16.0
+    # via -r requirements-build.in
 vcs-versioning==2.6.0
     # via -r requirements-build.in
 wheel==0.48.0
