@@ -87,7 +87,8 @@ Stage 4  │  Conflict detection + phase splitting  →  3 build .txt files
          │    (e.g. wheel==0.45.1 from ansible-core's pyproject.toml)
          │    and injects them into pre-build; later phases resolve newer versions
          │  ↳ If a single-package phase cannot compile, still emit that
-         │    package's PEP 517 upper-bound pin so Hermeto prefetches it
+         │    package's PEP 517 [build-system].requires so Hermeto
+         │    prefetches every isolation cap (not only the conflict dep)
          │
 Stage 4b │  Close transitive build-dep graph (sdist pyproject.toml)  →  patched
          │  ↳ Packages pip-compile pulled in only as a dependency-of-a-dependency
@@ -403,22 +404,29 @@ are in the cache. pip's PEP 517 isolation then fails with e.g.
 When a single-package phase fails to compile, the script:
 
 1. Detects this as an internal conflict (only one package in the phase).
-2. Looks up an **upper-bound requirement** for the conflicting dependency, in
+2. Fetches **all** `[build-system].requires` from that package's sdist
+   (`_pep517_isolation_requires`, same PyPI fetch as Stage 4b) — every PEP
+   517 isolation cap, not only the one dep pip-compile named as the
+   conflict. Prefetching only `setuptools<=70.0.0` still fails ART with
+   `No matching distribution found for setuptools-scm[toml]<=8.1.0,>=6.2
+   (from versions: 10.3.4)`.
+3. Writes those specs to this phase's `.in` and pip-compiles with
+   `--allow-unsafe` (so Hermeto prefetches e.g. `setuptools==70.0.0` **and**
+   `setuptools-scm==8.1.0`). The compile uses the phase filenames under
+   cwd — `./requirements-build1.txt` / `./requirements-build1.in` — not a
+   `/tmp/…` path, matching the pip-compile header style of the former
+   Dockerfile pipeline.
+4. If that compile fails (contradictory requires, e.g. kubernetes), falls
+   back to an **upper-bound requirement** for the conflicting dep only, in
    order, with no package names or versions hardcoded:
    - that package's collected `pip_find_builddeps` specs
      (`_upper_bound_requirement`)
    - the pip-compile error text (`_upper_bound_from_stderr`)
    - `[build-system].requires` from that package's sdist
-     (`_upper_bound_from_pyproject`, same PyPI fetch as Stage 4b)
-3. If a spec is found, writes it to this phase's `.in` and pip-compiles it
-   with `--allow-unsafe` into this phase's `.txt` (so Hermeto prefetches
-   e.g. `setuptools==70.0.0`). The compile uses the phase filenames under
-   cwd — `./requirements-build1.txt` / `./requirements-build1.in` — not a
-   `/tmp/…` path, matching the pip-compile header style of the former
-   Dockerfile pipeline.
-4. If no spec is found, or that compile fails, writes an explanatory comment
-   only (does not block the generate). The runtime package itself remains in
-   `requirements.txt`.
+     (`_upper_bound_from_pyproject`)
+5. If no spec is found, or both compiles fail, writes an explanatory
+   comment only (does not block the generate). The runtime package itself
+   remains in `requirements.txt`.
 
 The pin lands in whichever of the three build files this single-package
 phase mapped to (often `requirements-build1.txt`). That is enough for
@@ -616,6 +624,7 @@ packages are ever newly-discovered, and it converges in 1-2 passes.
 | `_upper_bound_from_stderr(dep, stderr)` | Upper-bounded requirement for *dep* parsed from pip-compile stderr |
 | `_pkg_version_from_requirements(out_dir, pkg)` | `pkg==X` version from Stage 2 `requirements.txt` |
 | `_upper_bound_from_pyproject(pkg, ver, dep)` | Upper-bounded *dep* from *pkg*'s sdist `[build-system].requires` |
+| `_pep517_isolation_requires(pkg, ver)` | Full `[build-system].requires` from *pkg*'s sdist (internal-conflict prefetch) |
 | `_find_older_group_by_compilation(dep, …)` | Per-package compilation to detect transitive conflicts |
 | `split_phases(packages, constraints, tmp)` | Core recursive phase-splitting algorithm |
 | `stage6_verify_completeness(all_pinned, out_dir)` | Verifies every Pipfile.lock package is correctly represented in requirements.txt |

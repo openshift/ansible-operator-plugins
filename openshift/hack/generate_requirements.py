@@ -557,6 +557,20 @@ def _upper_bound_from_pyproject(pkg: str, version: str, dep_norm: str) -> str | 
     )
 
 
+def _pep517_isolation_requires(pkg: str, version: str) -> list[str]:
+    """
+    Return ``[build-system].requires`` from *pkg*'s sdist — the exact set
+    PEP 517 isolation will ask Hermeto for when building that sdist.
+    """
+    if not version:
+        return []
+    return [
+        s.strip()
+        for s in _pyproject_build_system_requires(pkg, version)
+        if s.strip()
+    ]
+
+
 # ---------------------------------------------------------------------------
 # Core phase-splitting algorithm
 # ---------------------------------------------------------------------------
@@ -1137,21 +1151,25 @@ def stage4_build_phases(
             # are internally conflicting (e.g. kubernetes requiring both
             # setuptools-scm>=8 and setuptools_scm<8, or a PEP 517 cap on
             # setuptools that cannot be compiled with other collected deps).
-            # Skip compiling the full set. For Hermeto/ART (source-only
-            # prefetch) still emit the conflicting dep's upper-bound pin,
-            # taken from this package's collected specs, pip-compile stderr,
-            # or its own [build-system] requires — later phases only prefetch
-            # newer versions and the isolated sdist build then fails.
+            # Skip compiling the full collected set. For Hermeto/ART
+            # (source-only prefetch) compile that package's PEP 517
+            # [build-system].requires instead — isolation needs every cap
+            # (setuptools<=70 *and* setuptools-scm[toml]<=8.1.0), not only
+            # the one dep pip-compile named as the conflict. Later phases
+            # only prefetch newer versions and the isolated sdist build
+            # then fails with "from versions: 10.3.4".
             if len(phase_pkgs) == 1:
                 conflict_dep = _parse_conflict_dep(stderr)
                 print(
                     f"  → '{phase_pkgs[0]}' has an internal build-dep conflict"
-                    f" on '{conflict_dep}'; skipping its other build deps.",
+                    f" on '{conflict_dep}'; skipping its other collected"
+                    " build deps.",
                     file=sys.stderr,
                 )
                 pkg = phase_pkgs[0]
                 pkg_ver = _pkg_version_from_requirements(out_dir, pkg)
-                prefetch_spec = (
+                pep517 = _pep517_isolation_requires(pkg, pkg_ver or "")
+                single = (
                     _upper_bound_requirement(
                         conflict_dep or "", pkg_constraints.get(pkg, [])
                     )
@@ -1160,42 +1178,53 @@ def stage4_build_phases(
                         pkg, pkg_ver or "", conflict_dep or ""
                     )
                 )
+                candidates: list[list[str]] = []
+                if pep517:
+                    candidates.append(pep517)
+                if single and [single] not in candidates:
+                    candidates.append([single])
                 comment = (
                     f"# {base}.txt\n"
                     f"# '{pkg}' has an internal build-dep conflict"
                     f" on '{conflict_dep}'.\n"
-                    "# Other build deps are excluded; the package itself is"
-                    " in requirements.txt.\n"
+                    "# Other collected build deps are excluded; the package"
+                    " itself is in requirements.txt.\n"
                 )
-                if prefetch_spec:
+                pin_ok = False
+                pin_err = ""
+                used: list[str] = []
+                for specs in candidates:
                     # Compile through the phase's own .in/.txt so pip-compile's
                     # header is ``./requirements-build1.txt`` / ``.in``, not a
                     # /tmp/prefetch_* path.
-                    in_path.write_text(prefetch_spec + "\n")
+                    in_path.write_text("\n".join(specs) + "\n")
                     pin_ok, pin_err = _pip_compile(
                         in_path, txt_path, ["--allow-unsafe"]
                     )
                     if pin_ok:
-                        compiled = _comment_out(
-                            _normalize_quirks(txt_path.read_text()),
-                            rpm_norms,
-                        )
-                        comment += (
-                            f"# Keep {conflict_dep} at its PEP 517 upper bound"
-                            " so Hermeto prefetches it.\n"
-                        )
-                        txt_path.write_text(comment + compiled)
-                        print(
-                            f"  → hermetic prefetch pin from {prefetch_spec!r}"
-                            f" → {txt_path.name}",
-                            flush=True,
-                        )
-                        continue
+                        used = specs
+                        break
                     print(
-                        f"  WARNING: could not compile prefetch pin"
-                        f" {prefetch_spec!r}:\n{pin_err}",
+                        f"  WARNING: could not compile prefetch specs"
+                        f" {specs!r}:\n{pin_err}",
                         file=sys.stderr,
                     )
+                if pin_ok:
+                    compiled = _comment_out(
+                        _normalize_quirks(txt_path.read_text()),
+                        rpm_norms,
+                    )
+                    comment += (
+                        "# Keep PEP 517 [build-system] requires so Hermeto"
+                        " prefetches them.\n"
+                    )
+                    txt_path.write_text(comment + compiled)
+                    print(
+                        f"  → hermetic prefetch pin from {used!r}"
+                        f" → {txt_path.name}",
+                        flush=True,
+                    )
+                    continue
                 txt_path.write_text(comment)
                 continue
             # Multi-package failure: try to further split via split_phases and
