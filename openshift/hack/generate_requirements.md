@@ -86,6 +86,9 @@ Stage 4  │  Conflict detection + phase splitting  →  3 build .txt files
          │  ↳ Auto-discovers build-isolation exact pins from package metadata
          │    (e.g. wheel==0.45.1 from ansible-core's pyproject.toml)
          │    and injects them into pre-build; later phases resolve newer versions
+         │  ↳ If a single-package phase cannot compile, still emit that
+         │    package's PEP 517 [build-system].requires so Hermeto
+         │    prefetches every isolation cap (not only the conflict dep)
          │
 Stage 4b │  Close transitive build-dep graph (sdist pyproject.toml)  →  patched
          │  ↳ Packages pip-compile pulled in only as a dependency-of-a-dependency
@@ -382,16 +385,54 @@ tools. Because both versions are in the cachi2 cache:
 
 ### Internal Conflicts
 
-Some packages (e.g. `kubernetes==33.1.0`) have build dependencies that are
-mutually contradictory — the same package's own build-dep set requires both
-`setuptools-scm>=8` and `setuptools_scm<8`. This is an upstream packaging issue.
+Some packages have build dependencies that are mutually contradictory in the
+constraint set Stage 3 collected. Two common shapes:
+
+- The same package's own build-dep set requires both `setuptools-scm>=8` and
+  `setuptools_scm<8` (e.g. `kubernetes==33.1.0`).
+- A PEP 517 cap (e.g. `setuptools>=45,<=70.0.0` from a package's
+  `pyproject.toml`) cannot be compiled together with other collected build
+  deps that need a much newer setuptools. `split_phases` then parks that
+  package alone in a phase, and compiling *that* phase still fails.
+
+Writing an empty phase file is not enough for ART. Hermeto/Cachi2 defaults to
+**source-only** prefetch: only versions listed in the four requirements files
+are in the cache. pip's PEP 517 isolation then fails with e.g.
+`No matching distribution found for setuptools<=70.0.0,>=45 (from versions:
+84.0.0, 84.2.1)` if the capped version was never listed.
 
 When a single-package phase fails to compile, the script:
-1. Detects this as an internal conflict (only one package in the phase)
-2. Writes an explanatory comment to the `.txt` file (not a warning that blocks
-   the build)
-3. Continues — the package itself remains in `requirements.txt` and pip's own
-   build isolation can pull whatever it needs from the other build phases
+
+1. Detects this as an internal conflict (only one package in the phase).
+2. Fetches **all** `[build-system].requires` from that package's sdist
+   (`_pep517_isolation_requires`, same PyPI fetch as Stage 4b) — every PEP
+   517 isolation cap, not only the one dep pip-compile named as the
+   conflict. Prefetching only `setuptools<=70.0.0` still fails ART with
+   `No matching distribution found for setuptools-scm[toml]<=8.1.0,>=6.2
+   (from versions: 10.3.4)`.
+3. Writes those specs to this phase's `.in` and pip-compiles with
+   `--allow-unsafe` (so Hermeto prefetches e.g. `setuptools==70.0.0` **and**
+   `setuptools-scm==8.1.0`). The compile uses the phase filenames under
+   cwd — `./requirements-build1.txt` / `./requirements-build1.in` — not a
+   `/tmp/…` path, matching the pip-compile header style of the former
+   Dockerfile pipeline.
+4. If that compile fails (contradictory requires, e.g. kubernetes), falls
+   back to an **upper-bound requirement** for the conflicting dep only, in
+   order, with no package names or versions hardcoded:
+   - that package's collected `pip_find_builddeps` specs
+     (`_upper_bound_requirement`)
+   - the pip-compile error text (`_upper_bound_from_stderr`)
+   - `[build-system].requires` from that package's sdist
+     (`_upper_bound_from_pyproject`)
+5. If no spec is found, or both compiles fail, writes an explanatory
+   comment only (does not block the generate). The runtime package itself
+   remains in `requirements.txt`.
+
+The pin lands in whichever of the three build files this single-package
+phase mapped to (often `requirements-build1.txt`). That is enough for
+Hermeto: every listed version is prefetched, regardless of install order.
+A successful `split_phases` that compiles the older group still puts the
+full older tool set in **pre-build**, as in [Phased Upgrade Pattern](#phased-upgrade-pattern-pre-build-vs-build).
 
 ---
 
@@ -568,16 +609,22 @@ packages are ever newly-discovered, and it converges in 1-2 passes.
 | Function | Purpose |
 |---|---|
 | `_norm(name)` | Canonical package name (lowercase, `[-_.]` → `-`) |
+| `_compile_arg(path)` | Cwd-relative `./file` for pip-compile argv/headers; absolute for `/tmp` probes |
 | `_pip_compile(in, out, extra)` | Run pip-compile; return `(success, stderr)`, never exits |
 | `_read_pinned(text)` | Parse pip-freeze/pip-compile output → `{norm: "Pkg==ver"}` |
 | `_comment_out(text, norms)` | Prefix matching `pkg==` lines with `#` |
 | `_normalize_quirks(text)` | Fix `python-dateutil==2.9.0.post0` → `2.9.0` |
-| `_pyproject_build_system_requires(name, ver)` | Fetch `[build-system].requires` directly from a package's sdist `pyproject.toml` on PyPI, bypassing pip's [issue #7863][pip-7863] blind spot (Stage 4b) |
+| `_pyproject_build_system_requires(name, ver)` | Fetch `[build-system].requires` directly from a package's sdist `pyproject.toml` on PyPI, bypassing pip's [issue #7863][pip-7863] blind spot (Stage 4b and internal-conflict prefetch) |
 | `_strip_ansi(text)` | Remove terminal colour codes from Safety output |
 | `_parse_vuln_report(text)` | Parse Safety text into `[{package, version, vuln_id, affected_spec}]` |
 | `_min_safe_version(spec)` | Extract fix version from `"<X.Y.Z"` Safety spec |
 | `_parse_conflict_dep(stderr)` | Extract conflicting package name from pip-compile error; handles pip-tools 7.5+ and older formats |
 | `_pkgs_needing_older(dep, constraints)` | Packages with direct `<` or `<=` constraint on dep |
+| `_upper_bound_requirement(dep, specs)` | First spec in a list with `<` / `<=` on *dep* |
+| `_upper_bound_from_stderr(dep, stderr)` | Upper-bounded requirement for *dep* parsed from pip-compile stderr |
+| `_pkg_version_from_requirements(out_dir, pkg)` | `pkg==X` version from Stage 2 `requirements.txt` |
+| `_upper_bound_from_pyproject(pkg, ver, dep)` | Upper-bounded *dep* from *pkg*'s sdist `[build-system].requires` |
+| `_pep517_isolation_requires(pkg, ver)` | Full `[build-system].requires` from *pkg*'s sdist (internal-conflict prefetch) |
 | `_find_older_group_by_compilation(dep, …)` | Per-package compilation to detect transitive conflicts |
 | `split_phases(packages, constraints, tmp)` | Core recursive phase-splitting algorithm |
 | `stage6_verify_completeness(all_pinned, out_dir)` | Verifies every Pipfile.lock package is correctly represented in requirements.txt |
