@@ -15,9 +15,18 @@ RUN curl -LO https://raw.githubusercontent.com/containerbuildsystem/cachito/mast
 RUN python3 -m pip install pipenv==2023.11.15 \
     && python3 -m pip install pip-tools \
     && pipenv install --deploy \
-    # NOTE: This ignored vulnerability (74261) was detected in ansible-core, \
-    # but the fix is not available in any 2.15.z version of ansible-core as it has already reached EOL.
-    && pipenv check --ignore 74261 \
+    # 4.17 is Python 3.9. urllib3>=2.7 and ansible-core>=2.16 require Python>=3.10, \
+    # so these Safety findings cannot be fixed on this stream (certifi-only bump). \
+    # 90553 (CVE-2026-25645): requests - upgraded version doesn't support the protocol we use. \
+    # 74261 / 73302 / SFTY-20260605-18433 (CVE-2026-11332): ansible-core 2.15.z is EOL. \
+    # 96886 (CVE-2026-44431), SFTY-20260511-47957 (CVE-2026-44432), \
+    # SFTY-20260930-39688 (CVE-2026-97687), SFTY-20260930-79283 (CVE-2026-97689), \
+    # SFTY-20260930-11063 (CVE-2026-97688): urllib3 2.6.3 is the last 3.9-capable release. \
+    && pipenv check --ignore 90553 --ignore 74261 --ignore 73302 \
+         --ignore SFTY-20260605-18433 \
+         --ignore 96886 --ignore SFTY-20260511-47957 \
+         --ignore SFTY-20260930-39688 --ignore SFTY-20260930-79283 \
+         --ignore SFTY-20260930-11063 \
     && pipenv run pip freeze --all  > ./requirements.in \
     # NOTE: Comment out ansible-core, ansible-runner, and requests-unixsocket from
     # `requirements.in` to avoid dependency conflicts during pip-compile.

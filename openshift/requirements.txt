@@ -8,7 +8,7 @@ cachetools==5.5.2
     # via
     #   -r requirements.in
     #   google-auth
-certifi==2026.2.25
+certifi==2026.10.23
     # via
     #   -r requirements.in
     #   kubernetes
@@ -17,17 +17,17 @@ certifi==2026.2.25
     # via
     #   -r requirements.in
     #   cryptography
-charset-normalizer==3.4.6
+charset-normalizer==3.5.3
     # via
     #   -r requirements.in
     #   requests
-#cryptography==46.0.6
+#cryptography==50.0.2
     # via -r requirements.in
 google-auth==2.38.0
     # via
     #   -r requirements.in
     #   kubernetes
-idna==3.11
+idna==3.20
     # via
     #   -r requirements.in
     #   requests
@@ -43,16 +43,16 @@ lockfile==0.12.2
     # via
     #   -r requirements.in
     #   python-daemon
-markupsafe==3.0.3
+markupsafe==3.0.4
     # via
     #   -r requirements.in
     #   jinja2
-oauthlib==3.3.1
+oauthlib==4.0.1
     # via
     #   -r requirements.in
     #   kubernetes
     #   requests-oauthlib
-packaging==26.0
+packaging==26.3
     # via -r requirements.in
 pexpect==4.9.0
     # via -r requirements.in
@@ -60,7 +60,7 @@ ptyprocess==0.7.0
     # via
     #   -r requirements.in
     #   pexpect
-pyasn1==0.6.3
+pyasn1==0.6.5
     # via
     #   -r requirements.in
     #   pyasn1-modules
@@ -75,7 +75,7 @@ pyasn1-modules==0.4.2
     #   cffi
 python-daemon==3.1.2
     # via -r requirements.in
-python-dateutil==2.9.0
+python-dateutil==3.0.0
     # via
     #   -r requirements.in
     #   kubernetes
@@ -103,10 +103,14 @@ six==1.17.0
     #   -r requirements.in
     #   kubernetes
     #   python-dateutil
-typing-extensions==4.15.0
+typing-extensions==4.16.0
     # via
     #   -r requirements.in
     #   cryptography
+tzdata==2026.6
+    # via
+    #   -r requirements.in
+    #   python-dateutil
 urllib3==2.6.3
     # via
     #   -r requirements.in
@@ -116,7 +120,7 @@ websocket-client==1.9.0
     # via
     #   -r requirements.in
     #   kubernetes
-zipp==3.23.0
+zipp==3.23.1
     # via
     #   -r requirements.in
     #   importlib-metadata
@@ -125,5 +129,5 @@ zipp==3.23.0
 # pip
 # setuptools
 ansible-core==2.15.13
-ansible-runner==2.3.7
+ansible-runner==2.3.8
 requests-unixsocket==0.4.1
