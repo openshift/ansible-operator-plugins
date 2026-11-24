@@ -21,13 +21,18 @@ RUN set -e && yum clean all && rm -rf /var/cache/yum/* \
   && pip3 install --upgrade pip~=23.3.2 \
   && pip3 install pipenv==2023.11.15 \
   && pipenv lock \
-  # NOTE: This ignored vulnerability (71064) was detected in requests, \
-  # but the upgraded version doesn't support the use case (protocol we are using).\
-  # Ref: https://github.com/operator-framework/ansible-operator-plugins/pull/67#issuecomment-2189164688
-  # NOTE: This ignored vulnerability (74261) was detected in ansible-core, \
-  # but the fix is not available in any 2.15.z version of ansible-core as it has already reached EOL, See: \
-  #  - https://docs.ansible.com/ansible/latest/reference_appendices/release_and_maintenance.html#ansible-core-support-matrix
-  && pipenv check --ignore 71064 --ignore 74261 \
+  # 4.16 is Python 3.9. urllib3>=2.7 and ansible-core>=2.16 require Python>=3.10, \
+  # so these Safety findings cannot be fixed on this stream (certifi-only bump). \
+  # 90553 (CVE-2026-25645): requests - upgraded version doesn't support the protocol we use. \
+  # 74261 / 73302 / SFTY-20260605-18433 (CVE-2026-11332): ansible-core 2.15.z is EOL. \
+  # 96886 (CVE-2026-44431), SFTY-20260511-47957 (CVE-2026-44432), \
+  # SFTY-20260930-39688 (CVE-2026-97687), SFTY-20260930-79283 (CVE-2026-97689), \
+  # SFTY-20260930-11063 (CVE-2026-97688): urllib3 2.6.3 is the last 3.9-capable release. \
+  && pipenv check --ignore 90553 --ignore 74261 --ignore 73302 \
+       --ignore SFTY-20260605-18433 \
+       --ignore 96886 --ignore SFTY-20260511-47957 \
+       --ignore SFTY-20260930-39688 --ignore SFTY-20260930-79283 \
+       --ignore SFTY-20260930-11063 \
   && yum remove -y gcc libffi-devel openssl-devel python39-devel \
   && yum clean all \
   && rm -rf /var/cache/yum
