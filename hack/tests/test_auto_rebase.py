@@ -197,7 +197,7 @@ exec "$REAL_GIT" "$@"
             self.write(f"openshift/{name}", f"original {name}\n")
         self.commit("base")
         self.git("checkout", "-b", "upstream-release")
-        self.write("go.mod", "module example.test/operator\n\ngo 1.27.2\n")
+        self.write("go.mod", "module example.test/operator\n\ngo 1.26.5\n")
         self.write("OWNERS_ALIASES", "upstream owners\n")
         self.write("conflict.txt", "upstream\n")
         self.commit("upstream")
@@ -215,8 +215,10 @@ exec "$REAL_GIT" "$@"
         # Git wrapper: report a canonical upstream URL for rebase_upstream.sh's
         # validation, real git for everything else.
         self.command("git", '''
-[[ "$*" != "remote get-url upstream" ]] \\
-  || exec echo https://github.com/operator-framework/ansible-operator-plugins.git
+case "$*" in
+  "remote get-url upstream")
+    echo https://github.com/operator-framework/ansible-operator-plugins.git; exit ;;
+esac
 exec "$REAL_GIT" "$@"
 ''')
         self.command("go", '''
@@ -257,9 +259,13 @@ case "$1 $2" in
   *) exit 1 ;;
 esac
 ''')
+        fork_remote = self.base / "fork-remote.git"
+        subprocess.run([REAL_GIT, "init", "--bare", str(fork_remote)], check=True, capture_output=True)
+        self.git("remote", "add", "push-fork", str(fork_remote))
         self.env.update(DRY_RUN="0", CI="1", OVERRIDE_TAG="v1.10.0",
                         GITHUB_TOKEN="fake-token", DEST_ORG_REPO="example/test",
-                        REBASE_BRANCH="main", CONTAINER_ENGINE="fake-engine")
+                        REBASE_BRANCH="main", CONTAINER_ENGINE="fake-engine",
+                        PUSH_REMOTE="push-fork", PUSH_HEAD_PREFIX="test-bot")
         self.command("fake-engine", '''
 if [[ "$1" == info ]]; then
   [[ "${FAIL_ENGINE:-0}" != 1 ]]
@@ -274,6 +280,9 @@ exit 0
         body = (self.base / "calls.body").read_text()
         self.assertEqual("--draft" in calls, draft)
         self.assertEqual(self.git("status", "--porcelain"), "")
+        push_head = settings.get("PUSH_HEAD_PREFIX", self.env.get("PUSH_HEAD_PREFIX", ""))
+        if push_head:
+            self.assertIn(f"--head {push_head}:", calls)
         return result, body
 
     def test_workflow_opens_ready_pr(self):
@@ -288,7 +297,7 @@ exit 0
         self.assertIn("Overwritten conflicts:\nconflict.txt", merge_message)
         self.assertEqual((self.repo / "go.sum").read_text(), "new sums\n")
         for path in (".ci-operator.yaml", "openshift/Dockerfile"):
-            self.assertIn("golang-1.27-openshift-5.0", (self.repo / path).read_text())
+            self.assertIn("golang-1.26-openshift-5.0", (self.repo / path).read_text())
         self.assertTrue((self.repo / "openshift/release/ansible/ansible_collections/new.txt").is_file())
         for name in REQUIREMENTS:
             self.assertEqual((self.repo / f"openshift/{name}").read_text(), "generated\n")
@@ -318,6 +327,36 @@ exit 0
         self.git("push", "origin", "main")
         _, body = self.assert_workflow_pr(draft=True)
         self.assertIn("Go pins in .ci-operator.yaml and openshift/Dockerfile", body)
+
+    def test_workflow_drafts_when_go_version_bumped(self):
+        self.prepare_workflow()
+        self.git("checkout", "upstream-release")
+        self.write("go.mod", "module example.test/operator\n\ngo 1.27.2\n")
+        self.commit("upstream go bump")
+        self.git("tag", "-f", "v1.10.0")
+        self.git("checkout", "main")
+        self.git("push", "-f", "origin", "refs/tags/v1.10.0")
+        _, body = self.assert_workflow_pr(draft=True)
+        self.assertIn("go.mod requires Go 1.27 but builder pins use 1.26", body)
+
+    def test_push_goes_to_fork_remote(self):
+        self.prepare_workflow()
+        self.assert_workflow_pr()
+        fork_remote = self.base / "fork-remote.git"
+        branches = subprocess.check_output(
+            [REAL_GIT, "branch", "--list"], cwd=str(fork_remote), text=True)
+        self.assertIn("v1.10.0-rebase-main", branches)
+
+    def test_ensure_push_remote_configures_url(self):
+        self.prepare_workflow()
+        new_remote = self.base / "new-remote.git"
+        subprocess.run([REAL_GIT, "init", "--bare", str(new_remote)], check=True, capture_output=True)
+        self.assert_workflow_pr(
+            PUSH_REMOTE="new-fork", PUSH_REMOTE_URL=str(new_remote),
+            PUSH_HEAD_PREFIX="new-bot")
+        branches = subprocess.check_output(
+            [REAL_GIT, "branch", "--list"], cwd=str(new_remote), text=True)
+        self.assertIn("v1.10.0-rebase-main", branches)
 
     def test_existing_open_pr_is_skipped(self):
         self.prepare_workflow()
