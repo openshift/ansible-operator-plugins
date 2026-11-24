@@ -73,6 +73,11 @@ RUN python3 -m pip install pipenv==2023.11.15 \
   # Comment out setuptools-scm from requirements-build.in to avoid version conflicts during pip-compile
   && sed -i '/setuptools-scm/s/^/#/g' ./requirements-build.in \
   && sed -i '/setuptools_scm/s/^/#/g' ./requirements-build.in \
+  # Hermeto source-only: Hatch/sdist builds still require typing_extensions
+  # even when pip_find_builddeps no longer emits it (dropped after dateutil
+  # 4.0.0 / hatch-fancy-pypi-readme). Without this pin ART fails with
+  # "No matching distribution found for typing_extensions (from versions: none)".
+  && echo "typing-extensions" >> ./requirements-build.in \
   && pip-compile --output-file=./requirements-build.txt ./requirements-build.in --strip-extras --allow-unsafe \
   # NOTE: Comment out cryptography and its dependencies from the requirements-build.txt
   # files as these packages can't be installed in the isolated environment of OSBS image
