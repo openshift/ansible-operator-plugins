@@ -1,6 +1,10 @@
 FROM registry.ci.openshift.org/ocp/4.16:base-rhel9
 
-RUN yum install -y rust cargo libffi-devel python3-devel gcc python3-pip
+RUN set -e && dnf clean all && rm -rf /var/cache/dnf/* \
+  && dnf update -y \
+  && dnf install -y rust cargo libffi-devel python3.12-devel gcc \
+  && pushd /usr/local/bin && ln -sf ../../bin/python3.12 python3 && popd \
+  && python3 -m ensurepip --upgrade
 
 COPY ./Pipfile* ./
 
@@ -9,15 +13,25 @@ COPY ./Pipfile* ./
 RUN curl -LO https://raw.githubusercontent.com/containerbuildsystem/cachito/master/bin/pip_find_builddeps.py \
     && chmod +x pip_find_builddeps.py
 
+RUN python3 -m pip install --upgrade pip
+
+# setuptools-scm 10.0.1+ has backend-path with "../vcs-versioning/src" that
+# goes outside the source tree, causing pip to fail with
+# "ValueError: paths must be inside source tree" when building from source.
+# setuptools-scm 10 came in on March 19th which is why a rebuild of requirements lead to the below workaround.
+RUN echo 'setuptools-scm<10' > /constraints.txt
+ENV PIP_CONSTRAINT=/constraints.txt
+
 # Create requirements.in file from the pipenv created using the
 # same Pipfile and Pipfile.lock used for upstream image. Then
 # use pip-compile to generate the requirements.txt file.
 RUN python3 -m pip install pipenv==2023.11.15 \
     && python3 -m pip install pip-tools \
     && pipenv install --deploy \
-    # NOTE: This ignored vulnerability (74261) was detected in ansible-core, \
-    # but the fix is not available in any 2.15.z version of ansible-core as it has already reached EOL.
-    && pipenv check --ignore 74261 \
+    # NOTE: This ignored vulnerability is detected in a transitive dependency \
+    # but the upgraded version doesn't support the use case. \
+    # 90553 (CVE-2026-25645): requests - upgraded version doesn't support the protocol we use. \
+    && pipenv check --ignore 90553 \
     && pipenv run pip freeze --all  > ./requirements.in \
     # NOTE: Comment out ansible-core, ansible-runner, and requests-unixsocket from
     # `requirements.in` to avoid dependency conflicts during pip-compile.
@@ -68,7 +82,7 @@ RUN python3 -m pip install pipenv==2023.11.15 \
     # Comment out setuptools-scm from requirements-build.in to avoid version conflicts during pip-compile
     && sed -i '/setuptools-scm/s/^/#/g' ./requirements-build.in \
     && sed -i '/setuptools_scm/s/^/#/g' ./requirements-build.in \
-    && pip-compile --output-file=./requirements-build.txt ./requirements-build.in --strip-extras --allow-unsafe \
+    && pip-compile --output-file=./requirements-build.txt ./requirements-build.in --strip-extras --allow-unsafe -c /constraints.txt \
     # NOTE: Comment out cryptography and its dependencies from the requirements-build.txt
     # files as these packages can't be installed in the isolated environment of OSBS image
     # build. These packages will be installed through rpms.
@@ -100,14 +114,11 @@ RUN python3 -m pip install pipenv==2023.11.15 \
     # build isolation (which requires exactly wheel==0.45.1).
     # requirements-build.txt still has wheel==0.46.3 which upgrades it later.
     && sed -i 's/^wheel==.*/wheel==0.45.1/' ./requirements-pre-build.txt \
-    # Pin setuptools to 75.3.0 in pre-build so cachi2 fetches it for
-    # ansible-runner's build isolation (which requires setuptools<=75.3.0).
-    # requirements-build.txt still has setuptools==82.0.0 which upgrades it later.
-    && sed -i 's/^setuptools==.*/setuptools==75.3.0/' ./requirements-pre-build.txt \
-    # Pin setuptools-scm to 7.1.0 in pre-build so cachi2 fetches it for
-    # kubernetes's build isolation (which requires setuptools_scm<8.0).
-    # requirements-build.txt still has setuptools-scm==9.2.2 which upgrades it later.
-    && sed -i 's/^setuptools-scm==.*/setuptools-scm==7.1.0/' ./requirements-pre-build.txt
+    # Pin setuptools to 84.0.0 so cachi2 fetches it for ansible-core 2.18.19
+    # build isolation (setuptools>=66.1.0,<=84.0.0). pip-compile currently
+    # resolves 84.2.1, which is too new and fails hermetic ART builds.
+    && sed -i 's/^setuptools==.*/setuptools==84.0.0/' ./requirements-pre-build.txt \
+    && sed -i 's/^setuptools==.*/setuptools==84.0.0/' ./requirements-build.txt
 
 VOLUME /tmp/requirements
-ENTRYPOINT ["cp", "./requirements.txt", "./requirements-build.txt", "./requirements-build1.txt", "./requirements-pre-build.txt", "/tmp/requirements/"]
+ENTRYPOINT ["cp", "./requirements.txt", "./requirements-build.txt",  "./requirements-build1.txt", "./requirements-pre-build.txt", "/tmp/requirements/"]
