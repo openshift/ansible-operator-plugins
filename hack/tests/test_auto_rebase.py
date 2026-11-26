@@ -259,13 +259,9 @@ case "$1 $2" in
   *) exit 1 ;;
 esac
 ''')
-        fork_remote = self.base / "fork-remote.git"
-        subprocess.run([REAL_GIT, "init", "--bare", str(fork_remote)], check=True, capture_output=True)
-        self.git("remote", "add", "push-fork", str(fork_remote))
         self.env.update(DRY_RUN="0", CI="1", OVERRIDE_TAG="v1.10.0",
                         GITHUB_TOKEN="fake-token", DEST_ORG_REPO="example/test",
-                        REBASE_BRANCH="main", CONTAINER_ENGINE="fake-engine",
-                        PUSH_REMOTE="push-fork", PUSH_HEAD_PREFIX="test-bot")
+                        REBASE_BRANCH="main", CONTAINER_ENGINE="fake-engine")
         self.command("fake-engine", '''
 if [[ "$1" == info ]]; then
   [[ "${FAIL_ENGINE:-0}" != 1 ]]
@@ -280,9 +276,6 @@ exit 0
         body = (self.base / "calls.body").read_text()
         self.assertEqual("--draft" in calls, draft)
         self.assertEqual(self.git("status", "--porcelain"), "")
-        push_head = settings.get("PUSH_HEAD_PREFIX", self.env.get("PUSH_HEAD_PREFIX", ""))
-        if push_head:
-            self.assertIn(f"--head {push_head}:", calls)
         return result, body
 
     def test_workflow_opens_ready_pr(self):
@@ -338,25 +331,6 @@ exit 0
         self.git("push", "-f", "origin", "refs/tags/v1.10.0")
         _, body = self.assert_workflow_pr(draft=True)
         self.assertIn("go.mod requires Go 1.27 but builder pins use 1.26", body)
-
-    def test_push_goes_to_fork_remote(self):
-        self.prepare_workflow()
-        self.assert_workflow_pr()
-        fork_remote = self.base / "fork-remote.git"
-        branches = subprocess.check_output(
-            [REAL_GIT, "branch", "--list"], cwd=str(fork_remote), text=True)
-        self.assertIn("v1.10.0-rebase-main", branches)
-
-    def test_ensure_push_remote_configures_url(self):
-        self.prepare_workflow()
-        new_remote = self.base / "new-remote.git"
-        subprocess.run([REAL_GIT, "init", "--bare", str(new_remote)], check=True, capture_output=True)
-        self.assert_workflow_pr(
-            PUSH_REMOTE="new-fork", PUSH_REMOTE_URL=str(new_remote),
-            PUSH_HEAD_PREFIX="new-bot")
-        branches = subprocess.check_output(
-            [REAL_GIT, "branch", "--list"], cwd=str(new_remote), text=True)
-        self.assertIn("v1.10.0-rebase-main", branches)
 
     def test_existing_open_pr_is_skipped(self):
         self.prepare_workflow()

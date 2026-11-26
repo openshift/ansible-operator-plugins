@@ -36,10 +36,10 @@ The workflow:
 
 1. Compare `UPSTREAM-VERSION` to the newest upstream `v*` release tag.
 2. If newer, run `./openshift/hack/rebase_upstream.sh <tag> main`.
-3. Update golang builder pins (`.ci-operator.yaml`, `openshift/Dockerfile`) if
-   the upstream Go version changed. The OCP version suffix is kept as-is; the
-   resulting image is not verified, so a missing image surfaces as a CI failure
-   on the PR.
+3. Verify that golang builder pins in `.ci-operator.yaml` and
+   `openshift/Dockerfile` match the Go version in `go.mod`. If they disagree,
+   the PR is opened as a draft — pin updates are handled by the ART alignment
+   bot.
 4. Attempt `make -f openshift/Makefile update-collections` and
    `make -f openshift/Makefile generate-requirements`. If either fails, the
    committed outputs are restored so partial results are never committed.
@@ -96,9 +96,6 @@ OVERRIDE_TAG=v1.43.0 DRY_RUN=1 ./hack/auto-rebase.sh
 | `DEST_ORG_REPO` | `openshift/ansible-operator-plugins` | GitHub org/repo for PRs |
 | `GITHUB_TOKEN` | _(required)_ | Token for push + `gh pr create` |
 | `CONTAINER_ENGINE` | _(required for generation)_ | Engine executable, e.g. `podman` or `docker` |
-| `PUSH_REMOTE` | `origin` | Git remote to push rebase branches to |
-| `PUSH_REMOTE_URL` | _(unset)_ | If set, configure `PUSH_REMOTE` to this URL before push |
-| `PUSH_HEAD_PREFIX` | _(unset)_ | Fork org for cross-fork PRs, e.g. `openshift-app-platform-shift-bot` |
 | `DRY_RUN` | `0` | Only report what would happen |
 | `GIT_AUTHOR_NAME` | `openshift-app-platform-shift-bot` | Git identity for commits |
 | `GIT_AUTHOR_EMAIL` | `267347085+...@users.noreply.github.com` | Git identity email |

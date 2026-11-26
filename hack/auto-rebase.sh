@@ -10,24 +10,12 @@ source "$REPO_ROOT/openshift/hack/rebase-lib.sh"
 
 REBASE_BRANCH=${REBASE_BRANCH:-main}
 DEST_ORG_REPO=${DEST_ORG_REPO:-openshift/ansible-operator-plugins}
-PUSH_REMOTE=${PUSH_REMOTE:-origin}
 upstream_url=https://github.com/operator-framework/ansible-operator-plugins.git
 failures=()
 
 log() { printf '==> %s\n' "$*" >&2; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 fail_check() { log "WARNING: $*"; failures+=("$*"); }
-
-ensure_push_remote() {
-  [[ -n "${PUSH_REMOTE_URL:-}" ]] || return 0
-  local current
-  current=$(git remote get-url "$PUSH_REMOTE" 2>/dev/null) || current=""
-  if [[ -z "$current" ]]; then
-    git remote add "$PUSH_REMOTE" "$PUSH_REMOTE_URL"
-  elif [[ "$current" != "$PUSH_REMOTE_URL" ]]; then
-    git remote set-url "$PUSH_REMOTE" "$PUSH_REMOTE_URL"
-  fi
-}
 
 # Print the newest stable upstream tag newer than the pin, or nothing.
 newest_upstream_tag() {
@@ -70,11 +58,7 @@ create_pr() {
   fi
   body=$(printf '## Summary\nAutomated rebase to `%s` (previous pin: `%s`).\n\n%s\n\n## Human review\n- Review upstream changes and add needed `UPSTREAM: <carry>:` commits.\n- Request an ART test build to verify Python build dependencies.\n' \
     "$tag" "$pin" "$status")
-  local head_ref="$branch"
-  if [[ -n "${PUSH_HEAD_PREFIX:-}" ]]; then
-    head_ref="${PUSH_HEAD_PREFIX}:${branch}"
-  fi
-  gh pr create --repo "$DEST_ORG_REPO" --base "$REBASE_BRANCH" --head "$head_ref" \
+  gh pr create --repo "$DEST_ORG_REPO" --base "$REBASE_BRANCH" --head "$branch" \
     --title "Rebase to ${tag}" --body "$body" "${draft_args[@]}" \
     || die "Failed to create PR for ${branch}"
 }
@@ -104,11 +88,7 @@ main() {
     command -v "$tool" >/dev/null || die "Missing required tool: ${tool}"
   done
   git remote add upstream "$upstream_url" 2>/dev/null || true
-  local head_query="$branch"
-  if [[ -n "${PUSH_HEAD_PREFIX:-}" ]]; then
-    head_query="${PUSH_HEAD_PREFIX}:${branch}"
-  fi
-  count=$(gh pr list --repo "$DEST_ORG_REPO" --state open --head "$head_query" --base "$REBASE_BRANCH" \
+  count=$(gh pr list --repo "$DEST_ORG_REPO" --state open --head "$branch" --base "$REBASE_BRANCH" \
     --json number --jq 'length') || die "Failed to query existing PRs"
   if [[ "$count" -gt 0 ]]; then
     log "Open PR for ${tag} already exists; skipping"
@@ -137,8 +117,7 @@ main() {
     fail_check "Collections and requirements: CONTAINER_ENGINE must name a working engine; generation skipped"
   fi
   [[ -z "$(git status --porcelain)" ]] || die "Unexpected uncommitted files after rebase checks"
-  ensure_push_remote
-  git push -u "$PUSH_REMOTE" "$branch"
+  git push -u origin "$branch"
   create_pr "$tag" "$branch" "$pin"
   ((${#failures[@]} == 0)) || die "Checks failed; draft PR opened for manual fixes"
   log "Auto-rebase complete for ${tag}"
